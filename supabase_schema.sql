@@ -46,3 +46,25 @@ CREATE POLICY "Acceso público inventarios"
 
 CREATE POLICY "Acceso público revisiones"
   ON revisiones FOR ALL TO anon USING (true) WITH CHECK (true);
+
+-- Tabla de análisis cruzado (Soft vs Físico)
+CREATE TABLE IF NOT EXISTS analisis (
+  id          BIGSERIAL PRIMARY KEY,
+  sucursal    TEXT NOT NULL,
+  semana      INTEGER NOT NULL,
+  año         INTEGER NOT NULL,
+  soft_data   JSONB DEFAULT '{}',
+  fisico_data JSONB DEFAULT '{}',
+  resultados  JSONB DEFAULT '{}',
+  updated_at  TIMESTAMPTZ DEFAULT NOW(),
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(sucursal, semana, año)
+);
+
+CREATE INDEX IF NOT EXISTS idx_analisis_sucursal ON analisis(sucursal);
+CREATE INDEX IF NOT EXISTS idx_analisis_semana   ON analisis(semana, año);
+
+CREATE POLICY "Acceso público analisis"
+  ON analisis FOR ALL TO anon USING (true) WITH CHECK (true);
+
+ALTER TABLE analisis ENABLE ROW LEVEL SECURITY;

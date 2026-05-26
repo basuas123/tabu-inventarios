@@ -194,6 +194,7 @@ export default function DireccionPage() {
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <span style={{fontSize:12,color:'#666'}}>Semana {semana} · {new Date().toLocaleDateString('es-MX')}</span>
+          <button style={st.btn} onClick={()=>router.push('/soft')}>📊 Cargar Soft</button>
           <button style={st.btn} onClick={cargarDatos}>↻ Actualizar</button>
           <button style={st.btn} onClick={logout}>Salir</button>
         </div>
