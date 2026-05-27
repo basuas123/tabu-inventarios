@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import * as XLSX from 'xlsx'
+import { exportarAnalisisSoft, imprimir } from '../lib/exportar'
 
 const MERMAS = {
   'PESCADOS Y MARISCOS':0.15,'CARNES Y AVES':0.12,'FRUTAS Y VERDURAS':0.20,
@@ -389,9 +390,15 @@ export default function SoftPage() {
               )}
             </div>
 
-            <div style={{display:'flex',gap:10}}>
+            <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
               <button style={st.btn} onClick={()=>{setSoftData(null);setAnalisis(null);setTab('cargar')}}>
                 ← Cargar otro Soft
+              </button>
+              <button style={st.btn} onClick={()=>exportarAnalisisSoft({sucursal:SUCURSALES.find(s=>s.k===sucursal)?.n||sucursal,resultados:analisis.resultados,totalFalt:analisis.totalFalt,totalSobr:analisis.totalSobr,neto:analisis.neto,semana,año:new Date().getFullYear()})}>
+                📥 Exportar a Excel
+              </button>
+              <button style={st.btn} onClick={imprimir}>
+                🖨 Imprimir reporte
               </button>
               <button style={st.btnP} onClick={()=>router.push('/direccion')}>
                 Ver panel general →

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import productosDB from '../lib/productos.json'
+import { exportarInventarioSucursal, imprimir } from '../lib/exportar'
 
 const MERMAS = {
   'PESCADOS Y MARISCOS':0.15,'CARNES Y AVES':0.12,'FRUTAS Y VERDURAS':0.20,
