@@ -167,7 +167,7 @@ export default function SoftPage() {
       setAnalisis({ resultados, totalFalt, totalSobr, sinCruce, neto: totalFalt + totalSobr })
       setTab('analisis')
 
-      // Guardar en Supabase
+      // Guardar análisis en Supabase para que dirección lo vea
       fetch('/api/analisis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -177,8 +177,16 @@ export default function SoftPage() {
           año: new Date().getFullYear(),
           soft: softData,
           fisico,
-          resultados: { totalFalt, totalSobr, neto: totalFalt + totalSobr, items: resultados.length }
+          resultados: {
+            totalFalt,
+            totalSobr,
+            neto: totalFalt + totalSobr,
+            items: resultados.length,
+            detalle: resultados.slice(0, 100), // primeros 100 para no sobrepasar límite
+          }
         })
+      }).then(() => {
+        console.log('Análisis guardado en Supabase')
       }).catch(() => {})
 
       setLoading(false)

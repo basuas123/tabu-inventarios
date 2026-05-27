@@ -38,28 +38,68 @@ export default function InventarioPage() {
     setUser(u)
     const prods = productosDB[u.key]?.productos || []
     setProductos(prods)
-    // Cargar cantidades guardadas localmente
-    const local = localStorage.getItem(`inv_${u.key}_sem${semana}`)
-    if (local) setCantidades(JSON.parse(local))
-    const resp = localStorage.getItem(`resp_${u.key}`)
+    // Cargar cantidades — primero Supabase, luego localStorage como fallback
+    const resp = localStorage.getItem('resp_' + u.key)
     if (resp) setResponsable(resp)
+
+    fetch('/api/inventario?sucursal=' + u.key + '&semana=' + getWeek() + '&año=' + new Date().getFullYear())
+      .then(r => r.json())
+      .then(({ data }) => {
+        if (data && data.length > 0 && data[0].datos) {
+          setCantidades(data[0].datos)
+          if (data[0].responsable) setResponsable(data[0].responsable)
+        } else {
+          // Fallback localStorage
+          const local = localStorage.getItem('inv_' + u.key + '_sem' + getWeek())
+          if (local) setCantidades(JSON.parse(local))
+        }
+      })
+      .catch(() => {
+        const local = localStorage.getItem('inv_' + u.key + '_sem' + getWeek())
+        if (local) setCantidades(JSON.parse(local))
+      })
   }, [])
 
   const updateCantidad = useCallback((id, val) => {
+    const parsed = val === '' ? '' : parseFloat(val)
+
+    // Actualizar estado local inmediatamente
     setCantidades(prev => {
-      const next = { ...prev, [id]: val === '' ? '' : parseFloat(val) }
+      const next = { ...prev, [id]: parsed }
+      // Guardar en localStorage
+      if (user) localStorage.setItem('inv_' + user.key + '_sem' + semana, JSON.stringify(next))
       return next
     })
-  }, [])
+
+    // Guardar en Supabase con debounce de 800ms por producto
+    const timerKey = 'timer_' + id
+    if (window[timerKey]) clearTimeout(window[timerKey])
+    window[timerKey] = setTimeout(() => {
+      if (!user) return
+      fetch('/api/inventario_item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sucursal: user.key,
+          semana,
+          año: new Date().getFullYear(),
+          producto_id: id,
+          cantidad: parsed,
+          responsable,
+        })
+      }).then(() => {
+        setSavedMsg(true)
+        setTimeout(() => setSavedMsg(false), 1500)
+      }).catch(() => {
+        // Sin conexión — está en localStorage de todas formas
+      })
+    }, 800)
+  }, [user, semana, responsable])
 
   useEffect(() => {
     if (!user) return
-    const timer = setTimeout(() => {
-      localStorage.setItem(`inv_${user.key}_sem${semana}`, JSON.stringify(cantidades))
-      localStorage.setItem(`resp_${user.key}`, responsable)
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [cantidades, responsable, user, semana])
+    localStorage.setItem('resp_' + user.key, responsable)
+  }, [responsable, user])
 
   async function guardar() {
     setGuardando(true)

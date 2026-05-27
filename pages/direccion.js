@@ -39,25 +39,28 @@ function fmt(n) {
   return '$' + Math.abs(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function calcularImpacto(sucKey, datos) {
+function calcularImpacto(sucKey, datos, analisisData) {
   const prods = productosDB[sucKey]?.productos || []
-  if (!datos || Object.keys(datos).length === 0) return null
-  let faltante = 0, sobrante = 0, conDif = 0
-  prods.forEach(p => {
-    const f = parseFloat(datos[p.id]) || 0
-    if (datos[p.id] === undefined || datos[p.id] === '') return
-    const merma = p.merma ?? MERMAS[p.grupo] ?? 0.02
-    const ajustado = merma < 1 ? f / (1 - merma) : f
-    // Aquí iría el valor del sistema (Soft) — por ahora simulado
-    const sistema = ajustado * 1.0  // cuando integres Soft, reemplazar
-    const dif = ajustado - sistema
-    const imp = dif * (p.costo || 0)
-    if (Math.abs(dif) > 0.01) {
-      conDif++
-      if (imp < 0) faltante += imp; else sobrante += imp
+  const capturados = datos ? Object.keys(datos).filter(k => datos[k] !== '' && datos[k] !== undefined).length : 0
+  const total = prods.length
+
+  // Si hay análisis real (Soft cargado), usar esos números
+  if (analisisData?.resultados) {
+    const r = analisisData.resultados
+    return {
+      faltante: r.totalFalt || 0,
+      sobrante: r.totalSobr || 0,
+      neto: r.neto || 0,
+      conDif: r.items || 0,
+      capturados,
+      total,
+      tieneAnalisis: true,
     }
-  })
-  return { faltante, sobrante, neto: faltante + sobrante, conDif, capturados: Object.keys(datos).length, total: prods.length }
+  }
+
+  // Sin Soft cargado — solo mostrar progreso de captura
+  if (!datos || capturados === 0) return null
+  return { faltante: null, sobrante: null, neto: null, conDif: 0, capturados, total, tieneAnalisis: false }
 }
 
 export default function DireccionPage() {
@@ -80,37 +83,47 @@ export default function DireccionPage() {
 
   async function cargarDatos() {
     setLoading(true)
-    // Cargar inventarios de Supabase
+    // Cargar inventarios y análisis de Supabase
     try {
-      const res = await fetch(`/api/resumen?semana=${semana}&año=${new Date().getFullYear()}`)
-      const { data } = await res.json()
+      const año = new Date().getFullYear()
+      const [resInv, resAnal] = await Promise.all([
+        fetch('/api/resumen?semana=' + semana + '&año=' + año).then(r => r.json()),
+        fetch('/api/analisis?semana=' + semana + '&año=' + año).then(r => r.json()).catch(() => ({ data: [] })),
+      ])
+
+      const analisisMap = {}
+      if (resAnal.data) {
+        resAnal.data.forEach(row => {
+          analisisMap[row.sucursal] = row.resultados
+        })
+      }
+
       const map = {}
-      if (data) {
-        data.forEach(row => {
-          map[row.sucursal] = calcularImpacto(row.sucursal, row.datos) || {}
+      if (resInv.data) {
+        resInv.data.forEach(row => {
+          map[row.sucursal] = calcularImpacto(row.sucursal, row.datos, analisisMap[row.sucursal]) || {}
           map[row.sucursal].responsable = row.responsable
           map[row.sucursal].updated_at  = row.updated_at
         })
       }
-      // También revisar localStorage como fallback
+
+      // Fallback localStorage para sucursales sin datos en Supabase
       SUCURSALES.forEach(s => {
         if (!map[s.k]) {
-          const local = localStorage.getItem(`inv_${s.k}_sem${semana}`)
+          const local = localStorage.getItem('inv_' + s.k + '_sem' + semana)
           if (local) {
-            const datos = JSON.parse(local)
-            map[s.k] = calcularImpacto(s.k, datos) || {}
+            map[s.k] = calcularImpacto(s.k, JSON.parse(local), analisisMap[s.k]) || {}
             map[s.k].local = true
           }
         }
       })
       setResumen(map)
     } catch (e) {
-      // Solo localStorage
       const map = {}
       SUCURSALES.forEach(s => {
-        const local = localStorage.getItem(`inv_${s.k}_sem${semana}`)
+        const local = localStorage.getItem('inv_' + s.k + '_sem' + semana)
         if (local) {
-          map[s.k] = calcularImpacto(s.k, JSON.parse(local)) || {}
+          map[s.k] = calcularImpacto(s.k, JSON.parse(local), null) || {}
         }
       })
       setResumen(map)
@@ -246,13 +259,13 @@ export default function DireccionPage() {
                           {r ? `${r.capturados || 0}/${r.total || 0}` : '—'}
                         </td>
                         <td style={{padding:'8px 10px',color:'#C00000',fontWeight:r?.faltante?600:400}}>
-                          {r?.faltante ? fmt(r.faltante) : '—'}
+                          {r?.faltante !== null && r?.faltante !== undefined ? fmt(r.faltante) : '—'}
                         </td>
                         <td style={{padding:'8px 10px',color:'#3B6D11',fontWeight:r?.sobrante?600:400}}>
-                          {r?.sobrante ? fmt(r.sobrante) : '—'}
+                          {r?.sobrante !== null && r?.sobrante !== undefined ? fmt(r.sobrante) : '—'}
                         </td>
                         <td style={{padding:'8px 10px',fontWeight:600,color:estCol}}>
-                          {neto !== null ? fmt(neto) : '—'}
+                          {neto !== null ? fmt(neto) : r?.tieneAnalisis === false ? 'Sin Soft' : '—'}
                         </td>
                         <td style={{padding:'8px 10px'}}>
                           <span style={{background:estBg2,color:estCol,padding:'2px 8px',borderRadius:100,fontSize:11,fontWeight:700}}>
