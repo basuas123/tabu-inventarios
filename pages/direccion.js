@@ -69,6 +69,8 @@ export default function DireccionPage() {
   const [tab, setTab]           = useState('sucursales')
   const [resumen, setResumen]   = useState({})
   const [revisiones, setRevisiones] = useState([])
+  const [sucRevision, setSucRevision] = useState('')
+  const [analisisSuc, setAnalisisSuc] = useState(null)
   const [loading, setLoading]   = useState(true)
   const [semana] = useState(getWeek())
 
@@ -139,6 +141,20 @@ export default function DireccionPage() {
     }
 
     setLoading(false)
+  }
+
+  async function cargarAnalisisSucursal(sucKey) {
+    setSucRevision(sucKey)
+    if (!sucKey) { setAnalisisSuc(null); return }
+    try {
+      const res = await fetch('/api/analisis?sucursal=' + sucKey + '&semana=' + semana + '&año=' + new Date().getFullYear())
+      const { data } = await res.json()
+      if (data && data.length > 0 && data[0].resultados?.detalle) {
+        setAnalisisSuc(data[0].resultados)
+      } else {
+        setAnalisisSuc(null)
+      }
+    } catch(e) { setAnalisisSuc(null) }
   }
 
   async function cambiarEstatus(id, nuevoEstatus) {
@@ -284,11 +300,113 @@ export default function DireccionPage() {
 
         {tab === 'revision' && (
           <>
-            {/* Revisiones */}
+            {/* Selector de sucursal para ver análisis */}
+            <div style={st.card}>
+              <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:analisisSuc?16:0}}>
+                <div style={{fontWeight:600,fontSize:14}}>Ver discrepancias de:</div>
+                <select
+                  style={{padding:'7px 12px',border:'1px solid #ddd',borderRadius:8,fontSize:13,flex:1,maxWidth:280}}
+                  value={sucRevision}
+                  onChange={e=>cargarAnalisisSucursal(e.target.value)}
+                >
+                  <option value="">Selecciona una sucursal...</option>
+                  {SUCURSALES.map(s=><option key={s.k} value={s.k}>{s.n}</option>)}
+                </select>
+                {sucRevision && <span style={{fontSize:12,color:'#888'}}>Semana {semana}</span>}
+              </div>
+
+              {sucRevision && !analisisSuc && (
+                <div style={{padding:'20px',textAlign:'center',color:'#888',fontSize:13,background:'#f9f9f9',borderRadius:8}}>
+                  Esta sucursal no tiene análisis de Soft cargado esta semana.<br/>
+                  <span style={{fontSize:12}}>Usa el botón "Cargar Soft" para generar el análisis.</span>
+                </div>
+              )}
+
+              {analisisSuc && (
+                <>
+                  <div style={{display:'flex',gap:10,marginBottom:14}}>
+                    <div style={{background:'#FCEBEB',borderRadius:8,padding:'10px 14px',flex:1,textAlign:'center'}}>
+                      <div style={{fontSize:11,color:'#888',marginBottom:2}}>Pérdida</div>
+                      <div style={{fontSize:18,fontWeight:700,color:'#C00000'}}>{fmt(analisisSuc.totalFalt)}</div>
+                    </div>
+                    <div style={{background:'#EAF3DE',borderRadius:8,padding:'10px 14px',flex:1,textAlign:'center'}}>
+                      <div style={{fontSize:11,color:'#888',marginBottom:2}}>Sobrante</div>
+                      <div style={{fontSize:18,fontWeight:700,color:'#3B6D11'}}>{fmt(analisisSuc.totalSobr)}</div>
+                    </div>
+                    <div style={{background:'#FFF2CC',borderRadius:8,padding:'10px 14px',flex:1,textAlign:'center'}}>
+                      <div style={{fontSize:11,color:'#888',marginBottom:2}}>Impacto neto</div>
+                      <div style={{fontSize:18,fontWeight:700,color:analisisSuc.neto<0?'#C00000':'#3B6D11'}}>{fmt(analisisSuc.neto)}</div>
+                    </div>
+                  </div>
+
+                  <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                      <thead>
+                        <tr>
+                          {['Producto','Grupo','Diferencia','Impacto ($)','Resultado','Acción'].map(h=>(
+                            <th key={h} style={{textAlign:'left',padding:'7px 8px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:11}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(analisisSuc.detalle||[]).filter(r=>r.resultado!=='OK').map((r,i)=>(
+                          <tr key={r.nombre} style={{background:i%2?'#f9f9f9':'#fff'}}>
+                            <td style={{padding:'6px 8px',fontWeight:500}}>{r.nombre}</td>
+                            <td style={{padding:'6px 8px',color:'#888',fontSize:11}}>{r.grupo}</td>
+                            <td style={{padding:'6px 8px',textAlign:'right',color:r.dif<0?'#C00000':'#3B6D11',fontWeight:600}}>
+                              {r.dif>0?'+':''}{parseFloat(r.dif).toFixed(3)}
+                            </td>
+                            <td style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:r.imp<0?'#C00000':'#3B6D11'}}>
+                              {r.imp<0?'-':''}{fmt(r.imp)}
+                            </td>
+                            <td style={{padding:'6px 8px'}}>
+                              <span style={{background:r.resultado==='FALTANTE'?'#FCEBEB':'#EAF3DE',color:r.resultado==='FALTANTE'?'#A32D2D':'#3B6D11',padding:'2px 8px',borderRadius:100,fontSize:11,fontWeight:700}}>
+                                {r.resultado}
+                              </span>
+                            </td>
+                            <td style={{padding:'6px 8px'}}>
+                              <select
+                                style={{padding:'4px 8px',borderRadius:6,border:'1px solid #ddd',fontSize:11,cursor:'pointer'}}
+                                defaultValue="PENDIENTE"
+                                onChange={async e=>{
+                                  const suc = SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision
+                                  await fetch('/api/revisiones', {
+                                    method:'POST',
+                                    headers:{'Content-Type':'application/json'},
+                                    body:JSON.stringify({
+                                      sucursal: suc,
+                                      producto: r.nombre,
+                                      impacto: r.imp,
+                                      estatus: e.target.value,
+                                      notas: '',
+                                      semana,
+                                      año: new Date().getFullYear()
+                                    })
+                                  })
+                                  cargarDatos()
+                                }}
+                              >
+                                <option value="PENDIENTE">Pendiente</option>
+                                <option value="EN REVISIÓN">En revisión</option>
+                                <option value="CORREGIDO">Corregido</option>
+                                <option value="CONFIRMADO">Confirmado</option>
+                                <option value="A COBRO">A cobro</option>
+                              </select>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Revisiones registradas */}
             <div style={st.card}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-                <div style={{fontWeight:600,fontSize:14}}>Discrepancias en revisión</div>
-                <button style={st.btnPr} onClick={agregarRevision}>+ Agregar</button>
+                <div style={{fontWeight:600,fontSize:14}}>Historial de revisiones</div>
+                <button style={st.btnPr} onClick={agregarRevision}>+ Agregar manual</button>
               </div>
               {revisiones.length === 0 ? (
                 <div style={{textAlign:'center',padding:30,color:'#888',fontSize:13}}>Sin discrepancias registradas</div>
