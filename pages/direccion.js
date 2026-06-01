@@ -70,7 +70,10 @@ export default function DireccionPage() {
   const [resumen, setResumen]   = useState({})
   const [revisiones, setRevisiones] = useState([])
   const [sucRevision, setSucRevision] = useState('')
-  const [analisisSuc, setAnalisisSuc] = useState(null)
+  const [analisisSuc, setAnalisisSuc]   = useState(null)
+  const [historial, setHistorial]       = useState([])
+  const [semanaVer, setSemanaVer]       = useState(null)
+  const [resumenHist, setResumenHist]   = useState({})
   const [loading, setLoading]   = useState(true)
   const [semana] = useState(getWeek())
 
@@ -141,6 +144,45 @@ export default function DireccionPage() {
     }
 
     setLoading(false)
+  }
+
+  async function cargarHistorial() {
+    const añoH = new Date().getFullYear()
+    const semanas = []
+    for (let i = 0; i < 5; i++) {
+      const s = semana - i
+      if (s > 0) semanas.push(s)
+    }
+    const resultados = await Promise.all(
+      semanas.map(s =>
+        fetch('/api/resumen?semana=' + s + '&año=' + añoH)
+          .then(r => r.json())
+          .then(({ data }) => ({ semana: s, data: data || [] }))
+          .catch(() => ({ semana: s, data: [] }))
+      )
+    )
+    setHistorial(resultados.filter(r => r.data.length > 0))
+  }
+
+  async function verSemana(s) {
+    setSemanaVer(s)
+    const añoV = new Date().getFullYear()
+    try {
+      const [resInv, resAnal] = await Promise.all([
+        fetch('/api/resumen?semana=' + s + '&año=' + añoV).then(r => r.json()),
+        fetch('/api/analisis?semana=' + s + '&año=' + añoV).then(r => r.json()).catch(() => ({ data: [] })),
+      ])
+      const analisisMap = {}
+      if (resAnal.data) resAnal.data.forEach(row => { analisisMap[row.sucursal] = row.resultados })
+      const map = {}
+      if (resInv.data) {
+        resInv.data.forEach(row => {
+          map[row.sucursal] = calcularImpacto(row.sucursal, row.datos, analisisMap[row.sucursal]) || {}
+          map[row.sucursal].responsable = row.responsable
+        })
+      }
+      setResumenHist(map)
+    } catch(e) {}
   }
 
   async function cargarAnalisisSucursal(sucKey) {
@@ -256,6 +298,7 @@ export default function DireccionPage() {
         <div style={st.tabs}>
           <button style={st.tab(tab==='sucursales')} onClick={()=>setTab('sucursales')}>Sucursales</button>
           <button style={st.tab(tab==='revision')}   onClick={()=>setTab('revision')}>Revisión y cobro</button>
+          <button style={st.tab(tab==='historial')}  onClick={()=>{setTab('historial');cargarHistorial()}}>Historial</button>
         </div>
 
         {tab === 'sucursales' && (
@@ -503,6 +546,91 @@ export default function DireccionPage() {
                     ))}
                   </tbody>
                 </table>
+              )}
+            </div>
+          </>
+        )}
+
+        {tab === 'historial' && (
+          <>
+            <div style={st.card}>
+              <div style={{fontWeight:600,fontSize:14,marginBottom:16}}>
+                Historial de inventarios — últimas 4 semanas
+              </div>
+
+              {historial.length === 0 ? (
+                <div style={{textAlign:'center',padding:30,color:'#888',fontSize:13}}>
+                  No hay datos históricos. Los inventarios se guardan automáticamente cada semana.
+                </div>
+              ) : (
+                <div style={{display:'flex',gap:10,marginBottom:20,flexWrap:'wrap'}}>
+                  {historial.map(h => (
+                    <button
+                      key={h.semana}
+                      onClick={()=>verSemana(h.semana)}
+                      style={{
+                        padding:'10px 20px', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600,
+                        background: semanaVer===h.semana ? '#002060' : '#f5f5f5',
+                        color: semanaVer===h.semana ? '#fff' : '#333',
+                        border: semanaVer===h.semana ? 'none' : '1px solid #ddd',
+                      }}
+                    >
+                      Semana {h.semana}
+                      <span style={{display:'block',fontSize:11,fontWeight:400,opacity:0.8}}>
+                        {h.data.length} sucursal{h.data.length!==1?'es':''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {semanaVer && (
+                <>
+                  <div style={{fontWeight:600,fontSize:13,marginBottom:12,color:'#555'}}>
+                    Semana {semanaVer} — Resumen por sucursal
+                  </div>
+                  <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                      <thead>
+                        <tr>
+                          {['Sucursal','Capturados','Pérdida ($)','Sobrante ($)','Impacto neto ($)','Estado','Responsable'].map(h=>(
+                            <th key={h} style={{textAlign:'left',padding:'8px 10px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {SUCURSALES.map((s,i) => {
+                          const r = resumenHist[s.k]
+                          const neto = r?.neto ?? null
+                          const estCol = !r?'#888':neto===null?'#888':neto<-2000?'#C00000':neto<-500?'#EF9F27':'#3B6D11'
+                          const estBg2 = !r?'#f5f5f5':neto===null?'#f5f5f5':neto<-2000?'#FCEBEB':neto<-500?'#FAEEDA':'#EAF3DE'
+                          const estado = !r?'Sin datos':neto===null?'Sin Soft':neto<-2000?'CRÍTICA':neto<-500?'REVISAR':'OK'
+                          return (
+                            <tr key={s.k} style={{background:i%2?'#f9f9f9':'#fff'}}>
+                              <td style={{padding:'8px 10px',fontWeight:600}}>{s.n}</td>
+                              <td style={{padding:'8px 10px',color:'#555'}}>{r?`${r.capturados||0}/${r.total||0}`:'—'}</td>
+                              <td style={{padding:'8px 10px',color:'#C00000',fontWeight:r?.faltante?600:400}}>
+                                {r?.faltante!==null&&r?.faltante!==undefined?fmt(r.faltante):'—'}
+                              </td>
+                              <td style={{padding:'8px 10px',color:'#3B6D11',fontWeight:r?.sobrante?600:400}}>
+                                {r?.sobrante!==null&&r?.sobrante!==undefined?fmt(r.sobrante):'—'}
+                              </td>
+                              <td style={{padding:'8px 10px',fontWeight:600,color:estCol}}>
+                                {neto!==null?fmt(neto):'—'}
+                              </td>
+                              <td style={{padding:'8px 10px'}}>
+                                <span style={{background:estBg2,color:estCol,padding:'2px 8px',borderRadius:100,fontSize:11,fontWeight:700}}>
+                                  {estado}
+                                </span>
+                              </td>
+                              <td style={{padding:'8px 10px',color:'#888',fontSize:12}}>{r?.responsable||'—'}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           </>
