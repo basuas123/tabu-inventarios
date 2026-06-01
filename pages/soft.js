@@ -431,7 +431,7 @@ export default function SoftPage() {
               <button style={st.btn} onClick={()=>{setSoftData(null);setAnalisis(null);setTab('cargar')}}>
                 ← Cargar otro Soft
               </button>
-              <button style={st.btn} onClick={()=>exportarAnalisisSoft({sucursal:SUCURSALES.find(s=>s.k===sucursal)?.n||sucursal,resultados:analisis.resultados,totalFalt:analisis.totalFalt,totalSobr:analisis.totalSobr,neto:analisis.neto,semana,año:new Date().getFullYear()})}>
+              <button style={st.btn} onClick={()=>exportarAnalisisSoft({sucursal:SUCURSALES.find(s=>s.k===sucursal)?.n||sucursal,resultados:analisis.resultados,totalFalt:analisis.totalFalt,totalSobr:analisis.totalSobr,neto:analisis.neto,semana,año:new Date().getFullYear(),softData})}>
                 📥 Exportar a Excel
               </button>
               <button style={st.btn} onClick={imprimir}>
