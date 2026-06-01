@@ -3,15 +3,6 @@ import { useRouter } from 'next/router'
 import productosDB from '../lib/productos.json'
 import { exportarInventarioSucursal, imprimir } from '../lib/exportar'
 
-const MERMAS = {
-  'PESCADOS Y MARISCOS':0.15,'CARNES Y AVES':0.12,'FRUTAS Y VERDURAS':0.20,
-  'CONGELADOS':0.08,'LACTEOS Y REFRIGERADOS':0.05,'SALSAS Y ADEREZOS':0.03,
-  'SUPER ORIENTAL':0.05,'ABARROTES':0.02,'ABARROTES BAR':0.02,
-  'CERVECERIA':0.01,'COCA COLA':0.01,'CRISTALERIA BAR':0.00,
-  'LICORES':0.02,'VINOS':0.02,'DESECHABLES':0.02,
-  'LIMPIEZA':0.00,'PAPELERIA U OFICINA':0.00,'SERVICIO':0.00,
-}
-
 function getWeek() {
   const d = new Date()
   const start = new Date(d.getFullYear(), 0, 1)
@@ -146,10 +137,8 @@ export default function InventarioPage() {
   productos.forEach(p => {
     const f = parseFloat(cantidades[p.id]) || 0
     if (f === 0 && cantidades[p.id] === undefined) return
-    const merma = p.merma ?? MERMAS[p.grupo] ?? 0.02
-    const ajustado = merma < 1 ? f / (1 - merma) : f
-    const sistema = ajustado * (0.85 + Math.random() * 0.3) // placeholder
-    const dif = ajustado - sistema
+    const sistema = f * (0.85 + Math.random() * 0.3) // placeholder hasta cargar Soft
+    const dif = f - sistema
     const imp = dif * (p.costo || 0)
     if (Math.abs(dif) > 0.01) {
       if (imp < 0) totFalt += imp; else totSobr += imp

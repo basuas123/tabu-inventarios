@@ -3,15 +3,6 @@ import { useRouter } from 'next/router'
 import * as XLSX from 'xlsx'
 import { exportarAnalisisSoft, imprimir } from '../lib/exportar'
 
-const MERMAS = {
-  'PESCADOS Y MARISCOS':0.15,'CARNES Y AVES':0.12,'FRUTAS Y VERDURAS':0.20,
-  'CONGELADOS':0.08,'LACTEOS Y REFRIGERADOS':0.05,'SALSAS Y ADEREZOS':0.03,
-  'SUPER ORIENTAL':0.05,'ABARROTES':0.02,'ABARROTES BAR':0.02,
-  'CERVECERIA':0.01,'COCA COLA':0.01,'CRISTALERIA BAR':0.00,
-  'LICORES':0.02,'VINOS':0.02,'DESECHABLES':0.02,
-  'LIMPIEZA':0.00,'PAPELERIA U OFICINA':0.00,'SERVICIO':0.00,
-}
-
 const SUCURSALES = [
   {k:'playas',n:'Playas de Tijuana'},
   {k:'sanpedro',n:'Mexicali San Pedro'},
@@ -138,8 +129,7 @@ export default function SoftPage() {
         const softProd = softData[p.nombre]
         const sistema  = softProd?.existencia ?? null
         const costo    = softProd?.costo || p.costo || 0
-        const merma    = p.merma ?? MERMAS[p.grupo] ?? 0.02
-        const ajustado = tieneFisico ? (merma < 1 ? fis / (1 - merma) : fis) : null
+        const ajustado = tieneFisico ? fis : null  // sin merma: físico directo
 
         if (!softProd) { sinCruce++; }
 
@@ -378,7 +368,6 @@ export default function SoftPage() {
                           <td style={{padding:'6px 8px',fontWeight:500}}>{r.nombre}</td>
                           <td style={{padding:'6px 8px',color:'#888',fontSize:11}}>{r.grupo}</td>
                           <td style={{padding:'6px 8px',textAlign:'right'}}>{r.fisico.toFixed(3)}</td>
-                          <td style={{padding:'6px 8px',textAlign:'right'}}>{r.ajustado.toFixed(3)}</td>
                           <td style={{padding:'6px 8px',textAlign:'right'}}>{r.sistema.toFixed(3)}</td>
                           <td style={{padding:'6px 8px',textAlign:'right',fontWeight:600,color:r.dif<0?'#C00000':'#3B6D11'}}>
                             {r.dif>0?'+':''}{r.dif.toFixed(3)}
