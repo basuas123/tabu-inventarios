@@ -73,26 +73,83 @@ export default function SoftPage() {
         }
 
         const headers = rows[headerRow].map(c => String(c||'').toLowerCase().trim())
-        const colDesc  = headers.findIndex(h => h.includes('descripcion') && !h.includes('grupo'))
-        const colExist = headers.findIndex(h => h.includes('existencia') && h.includes('1'))
-        const colCosto = headers.findIndex(h => h.includes('costo'))
-        const colUnid  = headers.findIndex(h => h.includes('unidad'))
+
+        // Columnas del reporte de Soft Restaurant
+        const colDesc    = headers.findIndex(h => h === 'descripcion' || (h.includes('descripcion') && !h.includes('grupo')))
+        const colFisico  = headers.findIndex(h => h === 'fisicoalmacen1' || h.includes('fisico') && h.includes('1'))
+        const colExist   = headers.findIndex(h => h === 'existenciaalmacen1' || (h.includes('existencia') && h.includes('1')))
+        const colDifImp  = headers.findIndex(h => h === 'diferenciaimportealmacen1' || (h.includes('diferencia') && h.includes('importe')))
+        const colDifUnd  = headers.findIndex(h => h === 'diferenciaalmacen1' || (h.includes('diferencia') && !h.includes('importe') && h.includes('1')))
+        const colCosto   = headers.findIndex(h => h === 'costo')
+        const colUnid    = headers.findIndex(h => h === 'unidad')
 
         if (colDesc === -1) {
-          setError('No se encontró la columna "descripcion" en el archivo. Verifica que sea el reporte correcto de Soft Restaurant.')
+          setError('No se encontró la columna "descripcion". Verifica que sea el reporte de Soft Restaurant.')
           setLoading(false)
           return
         }
 
+        // Determinar si el archivo ya trae diferencias calculadas (formato completo de Soft)
+        const tieneCalculos = colDifImp >= 0 && colDifUnd >= 0
+
         const productos = {}
+        let totalFaltante = 0, totalSobrante = 0
+        const detalleProductos = []
+
         for (let i = headerRow + 1; i < rows.length; i++) {
           const row  = rows[i]
           const desc = String(row[colDesc] || '').trim().toUpperCase()
-          if (!desc || desc === 'NAN') continue
-          const exist = colExist >= 0 ? (parseFloat(row[colExist]) || 0) : 0
-          const costo = colCosto >= 0 ? (parseFloat(row[colCosto]) || 0) : 0
-          const unid  = colUnid  >= 0 ? String(row[colUnid] || '') : ''
-          productos[desc] = { existencia: exist, costo, unidad: unid }
+          if (!desc || desc === 'NAN' || desc === 'DESCRIPCION') continue
+
+          const fisico  = colFisico >= 0  ? (parseFloat(row[colFisico])  || 0) : 0
+          const exist   = colExist  >= 0  ? (parseFloat(row[colExist])   || 0) : 0
+          const costo   = colCosto  >= 0  ? (parseFloat(row[colCosto])   || 0) : 0
+          const unid    = colUnid   >= 0  ? String(row[colUnid] || '')        : ''
+          const difUnd  = colDifUnd >= 0  ? (parseFloat(row[colDifUnd])  || 0) : (fisico - exist)
+          const difImp  = colDifImp >= 0  ? (parseFloat(row[colDifImp])  || 0) : (difUnd * costo)
+
+          // Ignorar productos con existencia negativa en Soft (error histórico del sistema)
+          // Solo considerar diferencias donde la existencia del sistema es >= 0
+          const existValida = exist >= 0
+          const difReal     = existValida ? difUnd  : 0
+          const impReal     = existValida ? difImp  : 0
+
+          productos[desc] = { existencia: exist, fisico, costo, unidad: unid, difUnd: difReal, difImp: impReal, existValida }
+
+          if (existValida && Math.abs(difReal) > 0.001) {
+            if (impReal < 0) totalFaltante += impReal
+            else if (impReal > 0) totalSobrante += impReal
+            detalleProductos.push({ desc, difUnd: difReal, difImp: impReal, costo, grupo: '' })
+          }
+        }
+
+        // Si el archivo ya trae los cálculos de Soft, guardar el análisis directo
+        if (tieneCalculos) {
+          const analisisDirecto = {
+            totalFalt: totalFaltante,
+            totalSobr: totalSobrante,
+            neto: totalFaltante + totalSobrante,
+            items: detalleProductos.length,
+            detalle: detalleProductos.slice(0,100).map(p => ({
+              nombre: p.desc, grupo: p.grupo, fisico: p.difUnd + (productos[p.desc]?.existencia||0),
+              sistema: productos[p.desc]?.existencia || 0,
+              dif: p.difUnd, imp: p.difImp, costo: p.costo,
+              resultado: p.difImp < 0 ? 'FALTANTE' : 'SOBRANTE'
+            }))
+          }
+          // Guardar análisis en Supabase inmediatamente
+          fetch('/api/analisis', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sucursal,
+              semana,
+              año: new Date().getFullYear(),
+              soft: {},
+              fisico: {},
+              resultados: analisisDirecto
+            })
+          }).catch(()=>{})
         }
 
         setSoftData(productos)
@@ -100,7 +157,7 @@ export default function SoftPage() {
         setLoading(false)
 
         // Cargar físico guardado si hay
-        const saved = localStorage.getItem(`inv_${sucursal}_sem${semana}`)
+        const saved = localStorage.getItem('inv_' + sucursal + '_sem' + semana)
         if (saved) setFisico(JSON.parse(saved))
 
       } catch (err) {
@@ -115,73 +172,56 @@ export default function SoftPage() {
     if (!softData || !sucursal) return
     setLoading(true)
 
-    const softNombres = Object.keys(softData)
-    const resultados  = []
-    let totalFalt = 0, totalSobr = 0, sinCruce = 0
+    const resultados = []
+    let totalFalt = 0, totalSobr = 0
 
-    // Cargar productos de la sucursal
-    import('../lib/productos.json').then(modulo => {
-      const prods = modulo.default[sucursal]?.productos || []
+    // Usar diferencias ya calculadas por Soft Restaurant
+    Object.entries(softData).forEach(([nombre, prod]) => {
+      if (!prod.existValida) return  // ignorar existencias negativas en Soft
+      const dif = prod.difUnd || 0
+      const imp = prod.difImp || 0
+      if (Math.abs(dif) < 0.001) return  // sin diferencia significativa
 
-      prods.forEach(p => {
-        const fis    = parseFloat(fisico[p.id]) 
-        const tieneFisico = fis !== undefined && !isNaN(fis)
-        const softProd = softData[p.nombre]
-        const sistema  = softProd?.existencia ?? null
-        const costo    = softProd?.costo || p.costo || 0
-        const ajustado = tieneFisico ? fis : null  // sin merma: físico directo
+      if (imp < 0) totalFalt += imp
+      else         totalSobr += imp
 
-        if (!softProd) { sinCruce++; }
+      resultados.push({
+        nombre,
+        grupo:     prod.grupo   || '',
+        unidad:    prod.unidad  || '',
+        fisico:    prod.fisico  || 0,
+        sistema:   prod.existencia || 0,
+        costo:     prod.costo   || 0,
+        dif,
+        imp,
+        resultado: imp < 0 ? 'FALTANTE' : 'SOBRANTE',
+      })
+    })
 
-        if (tieneFisico && sistema !== null) {
-          const dif = ajustado - sistema
-          const imp = dif * costo
-          if (imp < 0) totalFalt += imp
-          else if (imp > 0) totalSobr += imp
-          resultados.push({
-            nombre: p.nombre,
-            grupo:  p.grupo,
-            unidad: p.unidad,
-            fisico: fis,
-            ajustado,
-            sistema,
-            costo,
-            dif,
-            imp,
-            resultado: Math.abs(dif) < 0.01 ? 'OK' : dif < 0 ? 'FALTANTE' : 'SOBRANTE',
-          })
+    resultados.sort((a,b) => a.imp - b.imp)
+    const neto = totalFalt + totalSobr
+    setAnalisis({ resultados, totalFalt, totalSobr, sinCruce: 0, neto })
+    setTab('analisis')
+
+    // Guardar en Supabase para que el panel de dirección lo vea
+    fetch('/api/analisis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sucursal, semana,
+        año: new Date().getFullYear(),
+        soft: {}, fisico: {},
+        resultados: {
+          totalFalt, totalSobr, neto,
+          items: resultados.length,
+          detalle: resultados.slice(0, 150),
         }
       })
+    }).catch(() => {})
 
-      resultados.sort((a,b) => a.imp - b.imp)
-      setAnalisis({ resultados, totalFalt, totalSobr, sinCruce, neto: totalFalt + totalSobr })
-      setTab('analisis')
-
-      // Guardar análisis en Supabase para que dirección lo vea
-      fetch('/api/analisis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sucursal,
-          semana,
-          año: new Date().getFullYear(),
-          soft: softData,
-          fisico,
-          resultados: {
-            totalFalt,
-            totalSobr,
-            neto: totalFalt + totalSobr,
-            items: resultados.length,
-            detalle: resultados.slice(0, 100), // primeros 100 para no sobrepasar límite
-          }
-        })
-      }).then(() => {
-        console.log('Análisis guardado en Supabase')
-      }).catch(() => {})
-
-      setLoading(false)
-    })
+    setLoading(false)
   }
+
 
   if (!user) return <div style={{padding:40,textAlign:'center'}}>Cargando...</div>
 
