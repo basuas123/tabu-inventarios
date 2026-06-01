@@ -188,10 +188,19 @@ export default function DireccionPage() {
   if (!user) return <div style={{padding:40,textAlign:'center'}}>Cargando...</div>
 
   const sucursalesConDatos   = SUCURSALES.filter(s => resumen[s.k])
-  const totalFaltante        = sucursalesConDatos.reduce((a,s) => a + (resumen[s.k]?.faltante || 0), 0)
-  const totalSobrante        = sucursalesConDatos.reduce((a,s) => a + (resumen[s.k]?.sobrante || 0), 0)
-  const criticas             = sucursalesConDatos.filter(s => (resumen[s.k]?.neto || 0) < -2000).length
-  const sinDatos             = SUCURSALES.length - sucursalesConDatos.length
+  const totalFaltante = sucursalesConDatos.reduce((a,s) => {
+    const v = resumen[s.k]?.faltante
+    return a + (v !== null && v !== undefined ? v : 0)
+  }, 0)
+  const totalSobrante = sucursalesConDatos.reduce((a,s) => {
+    const v = resumen[s.k]?.sobrante
+    return a + (v !== null && v !== undefined ? v : 0)
+  }, 0)
+  const criticas  = sucursalesConDatos.filter(s => {
+    const n = resumen[s.k]?.neto
+    return n !== null && n !== undefined && n < -2000
+  }).length
+  const sinDatos  = SUCURSALES.filter(s => !resumen[s.k] || resumen[s.k].capturados === 0).length
 
   const ESTATUSES = ['PENDIENTE','EN REVISIÓN','CORREGIDO','CONFIRMADO','A COBRO']
   const estColor  = { PENDIENTE:'#EF9F27',  'EN REVISIÓN':'#EF9F27', CORREGIDO:'#639922', CONFIRMADO:'#C00000', 'A COBRO':'#C00000' }
@@ -370,20 +379,37 @@ export default function DireccionPage() {
                                 defaultValue="PENDIENTE"
                                 onChange={async e=>{
                                   const suc = SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision
-                                  await fetch('/api/revisiones', {
-                                    method:'POST',
-                                    headers:{'Content-Type':'application/json'},
-                                    body:JSON.stringify({
-                                      sucursal: suc,
-                                      producto: r.nombre,
-                                      impacto: r.imp,
-                                      estatus: e.target.value,
-                                      notas: '',
-                                      semana,
-                                      año: new Date().getFullYear()
+                                  const nuevoEstatus = e.target.value
+                                  // Buscar si ya existe esta revisión
+                                  const existing = revisiones.find(
+                                    rev => rev.sucursal===suc && rev.producto===r.nombre
+                                  )
+                                  if (existing) {
+                                    // Actualizar existente
+                                    await fetch('/api/revisiones', {
+                                      method:'PATCH',
+                                      headers:{'Content-Type':'application/json'},
+                                      body:JSON.stringify({ id: existing.id, estatus: nuevoEstatus })
                                     })
-                                  })
-                                  cargarDatos()
+                                  } else {
+                                    // Crear nuevo
+                                    await fetch('/api/revisiones', {
+                                      method:'POST',
+                                      headers:{'Content-Type':'application/json'},
+                                      body:JSON.stringify({
+                                        sucursal: suc,
+                                        producto: r.nombre,
+                                        impacto: r.imp,
+                                        estatus: nuevoEstatus,
+                                        notas: '',
+                                        semana,
+                                        año: new Date().getFullYear()
+                                      })
+                                    })
+                                  }
+                                  await cargarDatos()
+                                  // Actualizar selector visualmente
+                                  e.target.value = nuevoEstatus
                                 }}
                               >
                                 <option value="PENDIENTE">Pendiente</option>
