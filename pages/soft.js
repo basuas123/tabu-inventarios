@@ -204,20 +204,24 @@ export default function SoftPage() {
     setTab('analisis')
 
     // Guardar en Supabase para que el panel de dirección lo vea
+    const bodyData = {
+      sucursal, semana,
+      año: new Date().getFullYear(),
+      soft: {}, fisico: {},
+      resultados: {
+        totalFalt, totalSobr, neto,
+        items: resultados.length,
+        detalle: resultados.slice(0, 150),
+      }
+    }
     fetch('/api/analisis', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sucursal, semana,
-        año: new Date().getFullYear(),
-        soft: {}, fisico: {},
-        resultados: {
-          totalFalt, totalSobr, neto,
-          items: resultados.length,
-          detalle: resultados.slice(0, 150),
-        }
-      })
-    }).catch(() => {})
+      body: JSON.stringify(bodyData)
+    }).then(r => r.json()).then(d => {
+      if (d.error) console.error('Error guardando análisis:', d.error)
+      else console.log('Análisis guardado OK para', sucursal, 'semana', semana)
+    }).catch(e => console.error('Error fetch analisis:', e))
 
     setLoading(false)
   }
@@ -397,7 +401,7 @@ export default function SoftPage() {
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
                     <thead>
                       <tr>
-                        {['Producto','Grupo','Físico','Ajustado','Sistema (Soft)','Diferencia','Costo ($)','Impacto ($)','Resultado'].map(h=>(
+                        {['Producto','Grupo','Físico','Sistema (Soft)','Diferencia','Costo ($)','Impacto ($)','Resultado'].map(h=>(
                           <th key={h} style={{textAlign:'left',padding:'7px 8px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,whiteSpace:'nowrap'}}>{h}</th>
                         ))}
                       </tr>

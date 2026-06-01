@@ -58,8 +58,12 @@ function calcularImpacto(sucKey, datos, analisisData) {
     }
   }
 
-  // Sin Soft cargado — solo mostrar progreso de captura
-  if (!datos || capturados === 0) return null
+  // Sin Soft — mostrar solo progreso si hay captura, o null si no hay nada
+  if (!datos || capturados === 0) {
+    return capturados > 0
+      ? { faltante: null, sobrante: null, neto: null, conDif: 0, capturados, total, tieneAnalisis: false }
+      : null
+  }
   return { faltante: null, sobrante: null, neto: null, conDif: 0, capturados, total, tieneAnalisis: false }
 }
 
@@ -96,34 +100,57 @@ export default function DireccionPage() {
         fetch('/api/analisis?semana=' + semana + '&año=' + año).then(r => r.json()).catch(() => ({ data: [] })),
       ])
 
+      // Construir mapa de análisis usando la clave de sucursal
       const analisisMap = {}
       if (resAnal.data) {
         resAnal.data.forEach(row => {
+          // Guardar tanto por clave directa como por búsqueda en SUCURSALES
           analisisMap[row.sucursal] = row.resultados
+          // También mapear por nombre por si acaso
+          const suc = SUCURSALES.find(s => s.k === row.sucursal || s.n === row.sucursal)
+          if (suc) analisisMap[suc.k] = row.resultados
         })
       }
 
       const map = {}
+
+      // Primero procesar inventarios capturados
       if (resInv.data) {
         resInv.data.forEach(row => {
-          map[row.sucursal] = calcularImpacto(row.sucursal, row.datos, analisisMap[row.sucursal]) || {}
+          const anal = analisisMap[row.sucursal]
+          map[row.sucursal] = calcularImpacto(row.sucursal, row.datos, anal) || {}
           map[row.sucursal].responsable = row.responsable
-          map[row.sucursal].updated_at  = row.updated_at
         })
       }
 
-      // Fallback localStorage para sucursales sin datos en Supabase
+      // Agregar sucursales con análisis Soft aunque no hayan capturado inventario
       SUCURSALES.forEach(s => {
+        const anal = analisisMap[s.k]
+        if (!map[s.k] && anal) {
+          map[s.k] = calcularImpacto(s.k, {}, anal) || {}
+        }
+        // Si ya está en map pero no tiene análisis, agregar el análisis
+        if (map[s.k] && !map[s.k].tieneAnalisis && anal) {
+          const conAnal = calcularImpacto(s.k, {}, anal)
+          if (conAnal) {
+            map[s.k] = { ...map[s.k], ...conAnal }
+          }
+        }
+        // Fallback localStorage
         if (!map[s.k]) {
           const local = localStorage.getItem('inv_' + s.k + '_sem' + semana)
           if (local) {
-            map[s.k] = calcularImpacto(s.k, JSON.parse(local), analisisMap[s.k]) || {}
+            map[s.k] = calcularImpacto(s.k, JSON.parse(local), anal) || {}
             map[s.k].local = true
           }
         }
       })
+
+      console.log('Resumen cargado:', Object.keys(map).length, 'sucursales')
+      console.log('Analisis cargado:', Object.keys(analisisMap))
       setResumen(map)
     } catch (e) {
+      console.error('Error cargarDatos:', e)
       const map = {}
       SUCURSALES.forEach(s => {
         const local = localStorage.getItem('inv_' + s.k + '_sem' + semana)
