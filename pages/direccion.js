@@ -97,20 +97,24 @@ export default function DireccionPage() {
       const año = new Date().getFullYear()
       const [resInv, resAnal] = await Promise.all([
         fetch('/api/resumen?semana=' + semana + '&año=' + año).then(r => r.json()),
-        fetch('/api/analisis?semana=' + semana + '&año=' + año).then(r => r.json()).catch(() => ({ data: [] })),
+        // Cargar análisis de las últimas 2 semanas para cubrir cambios de semana
+        fetch('/api/analisis?año=' + año).then(r => r.json()).catch(() => ({ data: [] })),
       ])
 
-      // Construir mapa de análisis usando la clave de sucursal
+      // Construir mapa de análisis — el más reciente por sucursal
       const analisisMap = {}
       if (resAnal.data) {
+        // Los datos vienen ordenados por updated_at DESC, tomar el más reciente por sucursal
         resAnal.data.forEach(row => {
-          // Guardar tanto por clave directa como por búsqueda en SUCURSALES
-          analisisMap[row.sucursal] = row.resultados
-          // También mapear por nombre por si acaso
+          if (!analisisMap[row.sucursal]) {
+            analisisMap[row.sucursal] = row.resultados
+          }
+          // También mapear por nombre
           const suc = SUCURSALES.find(s => s.k === row.sucursal || s.n === row.sucursal)
-          if (suc) analisisMap[suc.k] = row.resultados
+          if (suc && !analisisMap[suc.k]) analisisMap[suc.k] = row.resultados
         })
       }
+      console.log('Analisis disponibles:', Object.keys(analisisMap))
 
       const map = {}
 
