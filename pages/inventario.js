@@ -101,11 +101,25 @@ export default function InventarioPage() {
       }).then(() => {
         setSavedMsg(true)
         setTimeout(() => setSavedMsg(false), 1500)
+        // Si hay una revisión activa para este producto, actualizar cantidad_ajustada
+        if (parsed !== '' && !isNaN(parsed)) {
+          const prod = productos.find(p => p.id === id)
+          if (prod) {
+            const rev = revisiones.find(r => r.producto === prod.nombre.toUpperCase() || r.producto === prod.nombre)
+            if (rev) {
+              fetch('/api/revisiones', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: rev.id, cantidad_ajustada: parsed })
+              }).catch(() => {})
+            }
+          }
+        }
       }).catch(() => {
         // Sin conexión — está en localStorage de todas formas
       })
     }, 800)
-  }, [user, semana, responsable])
+  }, [user, semana, responsable, productos, revisiones])
 
   useEffect(() => {
     if (!user) return
