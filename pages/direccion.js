@@ -93,6 +93,7 @@ export default function DireccionPage() {
   const [acumSucDetalle, setAcumSucDetalle] = useState(null)
   const semanasDisponibles = Array.from({length:semana},(_,i)=>i+1)
   const semanasDesdeIni = semanasDisponibles.filter(s => s >= acumSemIni)
+  const semanaActual = semana
   const [semanaFiltro, setSemanaFiltro] = useState(getWeek())
   const [resumenFiltro, setResumenFiltro] = useState({})
 
@@ -393,7 +394,7 @@ export default function DireccionPage() {
                 }}
               >
                 {Array.from({length:semana},(_,i)=>semana-i).map(s=>(
-                  <option key={s} value={s}>Semana {s}{s===semana?' (actual)':''}</option>
+                  <option key={s} value={s}>Semana {s}{s===semanaActual?' (actual)':''}</option>
                 ))}
               </select>
             </div>
@@ -895,7 +896,7 @@ export default function DireccionPage() {
                   onChange={e=>setAcumSemFin(parseInt(e.target.value))}
                 >
                   {semanasDesdeIni.map(s=>(
-                    <option key={s} value={s}>Semana {s}{s===semana?' (actual)':''}</option>
+                    <option key={s} value={s}>Semana {s}{s===semanaActual?' (actual)':''}</option>
                   ))}
                 </select>
                 <button
