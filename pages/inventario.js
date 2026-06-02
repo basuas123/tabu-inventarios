@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
-import { exportarInventarioSucursal, imprimir } from '../lib/exportar'
+// exportar loaded dynamically
 
 function getWeek() {
   const d = new Date()
@@ -19,6 +19,7 @@ export default function InventarioPage() {
   const [guardando, setGuardando] = useState(false)
   const [savedMsg, setSavedMsg]   = useState(false)
   const [semana]                  = useState(getWeek())
+  const [revisiones, setRevisiones] = useState([])
 
   useEffect(() => {
     const stored = localStorage.getItem('tabu_user')
@@ -37,11 +38,18 @@ export default function InventarioPage() {
     const resp = localStorage.getItem('resp_' + u.key)
     if (resp) setResponsable(resp)
 
-    // Cargar revisiones pendientes de esta sucursal
-    fetch('/api/revisiones?sucursal=' + u.key)
+    // Cargar revisiones pendientes — filtrar por nombre de sucursal
+    fetch('/api/revisiones')
       .then(r => r.json())
       .then(({ data }) => {
-        if (data) setRevisiones(data.filter(r => r.estatus === 'EN REVISIÓN' || r.estatus === 'CONFIRMADO'))
+        if (data) {
+          // Filtrar solo las de esta sucursal (por nombre exacto)
+          const misSucursal = data.filter(r =>
+            r.sucursal === u.nombre &&
+            (r.estatus === 'EN REVISIÓN' || r.estatus === 'CONFIRMADO' || r.estatus === 'A COBRO')
+          )
+          setRevisiones(misSucursal)
+        }
       })
       .catch(() => {})
 
@@ -296,13 +304,20 @@ export default function InventarioPage() {
           <div style={{paddingBottom:20}}>
             {revisiones.length === 0 ? (
               <div style={{textAlign:'center',padding:40,color:'#888',fontSize:13}}>
-                Sin productos en revisión o confirmados por dirección.
+                Sin notificaciones de dirección para esta sucursal.
               </div>
             ) : (
               <>
-                <div style={{background:'#FAEEDA',borderRadius:8,padding:'12px 14px',marginBottom:14,fontSize:13,color:'#854F0B'}}>
-                  ⚠ Dirección solicita que revises los siguientes productos y confirmes las cantidades.
-                </div>
+                {revisiones.some(r=>r.estatus==='A COBRO') && (
+                  <div style={{background:'#FCEBEB',borderRadius:8,padding:'12px 14px',marginBottom:12,fontSize:13,color:'#C00000',fontWeight:600}}>
+                    🚨 Tienes productos marcados para cobro. Comunícate con dirección.
+                  </div>
+                )}
+                {revisiones.some(r=>r.estatus==='EN REVISIÓN'||r.estatus==='CONFIRMADO') && (
+                  <div style={{background:'#FAEEDA',borderRadius:8,padding:'12px 14px',marginBottom:14,fontSize:13,color:'#854F0B'}}>
+                    ⚠ Dirección solicita que revises los siguientes productos y confirmes las cantidades.
+                  </div>
+                )}
                 <div style={{background:'#fff',borderRadius:10,border:'1px solid #eee',overflow:'hidden'}}>
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                     <thead>
