@@ -370,7 +370,7 @@ export default function DireccionPage() {
           <button style={st.tab(tab==='sucursales')} onClick={()=>setTab('sucursales')}>Sucursales</button>
           <button style={st.tab(tab==='revision')}   onClick={()=>setTab('revision')}>Revisión y cobro</button>
           <button style={st.tab(tab==='cobros')}    onClick={()=>setTab('cobros')}>
-            {cobros.length>0?'💰 A cobrar ('+cobros.length+')':'A cobrar'}
+            {cobros.length ? '💰 A cobrar ('+cobros.length+')' : 'A cobrar'}
           </button>
           <button style={st.tab(tab==='historial')}  onClick={()=>{setTab('historial');cargarHistorial()}}>Historial</button>
           <button style={st.tab(tab==='acumulado')}  onClick={()=>setTab('acumulado')}>Acumulado</button>
@@ -524,10 +524,10 @@ export default function DireccionPage() {
                             <td style={{padding:'6px 8px',fontWeight:500}}>{r.nombre}</td>
                             <td style={{padding:'6px 8px',color:'#888',fontSize:11}}>{r.grupo}</td>
                             <td style={{padding:'6px 8px',textAlign:'right',color:r.dif<0?'#C00000':'#3B6D11',fontWeight:600}}>
-                              {r.dif>0?'+':''}{parseFloat(r.dif).toFixed(3)}
+                              {r.dif && r.dif !== 0 ? (r.dif > 0 ? '+' : '') : ''}{parseFloat(r.dif||0).toFixed(3)}
                             </td>
                             <td style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:r.imp<0?'#C00000':'#3B6D11'}}>
-                              {r.imp<0?'-':''}{fmt(r.imp)}
+                              {r.imp && r.imp !== 0 ? (r.imp < 0 ? '-' : '') : ''}{fmt(r.imp)}
                             </td>
                             <td style={{padding:'6px 8px'}}>
                               <span style={{background:r.resultado==='FALTANTE'?'#FCEBEB':'#EAF3DE',color:r.resultado==='FALTANTE'?'#A32D2D':'#3B6D11',padding:'2px 8px',borderRadius:100,fontSize:11,fontWeight:700}}>
@@ -831,9 +831,9 @@ export default function DireccionPage() {
                     const nombreSuc = SUCURSALES.find(s=>s.k===sucRevision)?.n
                     const r = resumenHist[sucRevision]
                     const neto = r?.neto ?? null
-                    const estCol = !r?'#888':neto===null?'#888':neto<-2000?'#C00000':neto<-500?'#EF9F27':'#3B6D11'
-                    const estBg2 = !r?'#f5f5f5':neto===null?'#f5f5f5':neto<-2000?'#FCEBEB':neto<-500?'#FAEEDA':'#EAF3DE'
-                    const estado = !r?'Sin datos':neto===null?'Sin Soft':neto<-2000?'CRÍTICA':neto<-500?'REVISAR':'OK'
+                    const estCol = colorNeto(neto, 2000, 500)
+                    const estBg2 = !r||neto===null?'#f5f5f5':colorNeto(neto,2000,500)==='#C00000'?'#FCEBEB':colorNeto(neto,2000,500)==='#EF9F27'?'#FAEEDA':'#EAF3DE'
+                    const estado = !r?'Sin datos':neto===null?'Sin Soft':estadoNeto(neto)
                     return (
                       <div style={{background:'#f9f9f9',borderRadius:10,padding:'16px 20px'}}>
                         <div style={{fontWeight:600,fontSize:14,marginBottom:14}}>
