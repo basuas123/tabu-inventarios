@@ -662,7 +662,7 @@ export default function DireccionPage() {
                     <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                       <thead>
                         <tr>
-                          {['Producto','Diferencia','Monto ($)','Notas','Acción'].map(h=>(
+                          {['Producto','Unidad','Diferencia','Monto ($)','Notas','Acción'].map(h=>(
                             <th key={h} style={{textAlign:'left',padding:'7px 10px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12}}>{h}</th>
                           ))}
                         </tr>
@@ -671,6 +671,9 @@ export default function DireccionPage() {
                         {itemsSuc.map((r,i)=>(
                           <tr key={i} style={{background:i%2?'#f9f9f9':'#fff'}}>
                             <td style={{padding:'7px 10px',fontWeight:600}}>{r.producto}</td>
+                            <td style={{padding:'7px 10px',color:'#888',fontSize:12}}>
+                              {(analisisSuc?.detalle||[]).find(d=>d.nombre===r.producto||d.nombre?.toUpperCase()===r.producto?.toUpperCase())?.unidad||'—'}
+                            </td>
                             <td style={{padding:'7px 10px',color:'#C00000',fontWeight:600}}>
                               {r.impacto ? r.impacto.toFixed(3) : '—'}
                             </td>
