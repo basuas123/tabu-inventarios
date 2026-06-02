@@ -997,7 +997,7 @@ export default function DireccionPage() {
                 {/* Tabla resumen acumulado */}
                 <div style={st.card}>
                   <div style={{fontWeight:600,fontSize:14,marginBottom:12,color:'#555'}}>
-                    Resumen semanas {acumSemIni}–{acumSemFin} · {acumSemFin-acumSemIni+1} semanas
+                    Resumen semanas {acumSemIni}–{acumSemFin} · {acumSemFin - acumSemIni + 1} semanas
                   </div>
                   <div style={{overflowX:'auto'}}>
                     <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
@@ -1022,7 +1022,7 @@ export default function DireccionPage() {
                               <td style={{padding:'8px 10px'}}>
                                 <button
                                   style={{padding:'4px 10px',borderRadius:6,border:'1px solid #ddd',background:'#fff',cursor:'pointer',fontSize:11,fontWeight:500}}
-                                  onClick={()=>setAcumSucDetalle(acumSucDetalle===s.k?null:s.k)}
+                                  onClick={()=>{ const next = acumSucDetalle===s.k ? null : s.k; setAcumSucDetalle(next) }}
                                 >{acumSucDetalle===s.k?'Ocultar':'Ver semanas'}</button>
                               </td>
                             </tr>
