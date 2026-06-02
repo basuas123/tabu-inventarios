@@ -91,6 +91,8 @@ export default function DireccionPage() {
   const [acumData, setAcumData]     = useState(null)
   const [acumCargando, setAcumCargando] = useState(false)
   const [acumSucDetalle, setAcumSucDetalle] = useState(null)
+  const semanasDisponibles = Array.from({length:semana},(_,i)=>i+1)
+  const semanasDesdeIni = semanasDisponibles.filter(s => s >= acumSemIni)
   const [semanaFiltro, setSemanaFiltro] = useState(getWeek())
   const [resumenFiltro, setResumenFiltro] = useState({})
 
@@ -892,7 +894,7 @@ export default function DireccionPage() {
                   value={acumSemFin}
                   onChange={e=>setAcumSemFin(parseInt(e.target.value))}
                 >
-                  {Array.from({length:semana},(_,i)=>i+1).filter(s=>s-acumSemIni>=0).map(s=>(
+                  {semanasDesdeIni.map(s=>(
                     <option key={s} value={s}>Semana {s}{s===semana?' (actual)':''}</option>
                   ))}
                 </select>
