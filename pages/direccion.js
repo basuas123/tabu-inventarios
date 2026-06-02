@@ -45,16 +45,23 @@ function calcularImpacto(sucKey, datos, analisisData) {
   const total = prods.length
 
   // Si hay análisis real (Soft cargado), usar esos números
-  if (analisisData?.resultados) {
-    const r = analisisData.resultados
-    return {
-      faltante: r.totalFalt || 0,
-      sobrante: r.totalSobr || 0,
-      neto: r.neto || 0,
-      conDif: r.items || 0,
-      capturados,
-      total,
-      tieneAnalisis: true,
+  // analisisData ES directamente el objeto resultados de Supabase
+  if (analisisData) {
+    // Puede venir como analisisData.resultados o directamente como analisisData
+    const r = analisisData.resultados || analisisData
+    const falt = parseFloat(r.totalFalt) || 0
+    const sobr = parseFloat(r.totalSobr) || 0
+    const net  = parseFloat(r.neto)      || 0
+    if (falt !== 0 || sobr !== 0) {
+      return {
+        faltante: falt,
+        sobrante: sobr,
+        neto:     net,
+        conDif:   r.items || 0,
+        capturados,
+        total,
+        tieneAnalisis: true,
+      }
     }
   }
 
