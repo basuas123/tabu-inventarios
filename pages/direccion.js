@@ -291,7 +291,6 @@ export default function DireccionPage() {
   const estColor  = { PENDIENTE:'#EF9F27',  'EN REVISIÓN':'#EF9F27', CORREGIDO:'#639922', CONFIRMADO:'#C00000', 'A COBRO':'#C00000' }
   const estBg     = { PENDIENTE:'#FAEEDA', 'EN REVISIÓN':'#FAEEDA', CORREGIDO:'#EAF3DE', CONFIRMADO:'#FCEBEB', 'A COBRO':'#FCEBEB' }
 
-  const cobros    = revisiones.filter(r => r.estatus === 'A COBRO')
   const totalCobro = cobros.reduce((a,r) => a + Math.abs(r.impacto || 0), 0)
 
   const st = {
