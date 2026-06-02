@@ -86,6 +86,11 @@ export default function DireccionPage() {
   const [resumenHist, setResumenHist]   = useState({})
   const [loading, setLoading]   = useState(true)
   const [semana] = useState(getWeek())
+  const [acumSemIni, setAcumSemIni] = useState(1)
+  const [acumSemFin, setAcumSemFin] = useState(getWeek())
+  const [acumData, setAcumData]     = useState(null)
+  const [acumCargando, setAcumCargando] = useState(false)
+  const [acumSucDetalle, setAcumSucDetalle] = useState(null)
   const [semanaFiltro, setSemanaFiltro] = useState(getWeek())
   const [resumenFiltro, setResumenFiltro] = useState({})
 
@@ -352,6 +357,7 @@ export default function DireccionPage() {
             {cobros.length>0?'💰 A cobrar ('+cobros.length+')':'A cobrar'}
           </button>
           <button style={st.tab(tab==='historial')}  onClick={()=>{setTab('historial');cargarHistorial()}}>Historial</button>
+          <button style={st.tab(tab==='acumulado')}  onClick={()=>setTab('acumulado')}>Acumulado</button>
         </div>
 
         {tab === 'sucursales' && (
@@ -863,6 +869,165 @@ export default function DireccionPage() {
             </div>
           </>
         )}
+      </div>
+
+        {tab === 'acumulado' && (
+          <>
+            {/* Selectores de rango */}
+            <div style={st.card}>
+              <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+                <span style={{fontSize:13,fontWeight:600,color:'#555'}}>Semana inicio:</span>
+                <select
+                  style={{padding:'6px 12px',border:'1px solid #ddd',borderRadius:8,fontSize:13}}
+                  value={acumSemIni}
+                  onChange={e=>setAcumSemIni(parseInt(e.target.value))}
+                >
+                  {Array.from({length:semana},(_,i)=>i+1).map(s=>(
+                    <option key={s} value={s}>Semana {s}</option>
+                  ))}
+                </select>
+                <span style={{fontSize:13,fontWeight:600,color:'#555'}}>Semana fin:</span>
+                <select
+                  style={{padding:'6px 12px',border:'1px solid #ddd',borderRadius:8,fontSize:13}}
+                  value={acumSemFin}
+                  onChange={e=>setAcumSemFin(parseInt(e.target.value))}
+                >
+                  {Array.from({length:semana},(_,i)=>i+1).filter(s=>s>=acumSemIni).map(s=>(
+                    <option key={s} value={s}>Semana {s}{s===semana?' (actual)':''}</option>
+                  ))}
+                </select>
+                <button
+                  style={{padding:'7px 18px',borderRadius:8,border:'none',background:'#002060',color:'#fff',cursor:'pointer',fontSize:13,fontWeight:600}}
+                  disabled={acumCargando}
+                  onClick={async ()=>{
+                    setAcumCargando(true)
+                    setAcumSucDetalle(null)
+                    const año = new Date().getFullYear()
+                    const semanas = Array.from({length:acumSemFin-acumSemIni+1},(_,i)=>acumSemIni+i)
+                    // Cargar todas las semanas en paralelo
+                    const resultados = await Promise.all(semanas.map(async s=>{
+                      const [resR, analR] = await Promise.all([
+                        fetch('/api/resumen?semana='+s+'&año='+año).then(r=>r.json()).catch(()=>({data:[]})),
+                        fetch('/api/analisis?semana='+s+'&año='+año).then(r=>r.json()).catch(()=>({data:[]})),
+                      ])
+                      const analMap = {}
+                      if (analR.data) analR.data.forEach(row=>{ analMap[row.sucursal]=row.resultados })
+                      const map = {}
+                      if (resR.data) resR.data.forEach(row=>{
+                        map[row.sucursal] = calcularImpacto(row.sucursal, row.datos, analMap[row.sucursal]) || {}
+                      })
+                      return { semana: s, data: map }
+                    }))
+                    // Acumular por sucursal
+                    const acum = {}
+                    SUCURSALES.forEach(s=>{ acum[s.k] = { faltante:0, sobrante:0, neto:0, semanas:[] } })
+                    resultados.forEach(({semana:s, data})=>{
+                      SUCURSALES.forEach(suc=>{
+                        const r = data[suc.k]
+                        if (r?.faltante!=null) acum[suc.k].faltante += r.faltante
+                        if (r?.sobrante!=null) acum[suc.k].sobrante += r.sobrante
+                        if (r?.neto!=null) acum[suc.k].neto += r.neto
+                        acum[suc.k].semanas.push({ semana:s, ...r })
+                      })
+                    })
+                    setAcumData(acum)
+                    setAcumCargando(false)
+                  }}
+                >{acumCargando ? 'Cargando...' : 'Consultar'}</button>
+              </div>
+            </div>
+
+            {acumData && (
+              <>
+                {/* Tabla resumen acumulado */}
+                <div style={st.card}>
+                  <div style={{fontWeight:600,fontSize:14,marginBottom:12,color:'#555'}}>
+                    Resumen semanas {acumSemIni}–{acumSemFin} · {acumSemFin-acumSemIni+1} semanas
+                  </div>
+                  <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                      <thead>
+                        <tr>
+                          {['Sucursal','Faltante ($)','Sobrante ($)','Impacto neto ($)','Detalle'].map(h=>(
+                            <th key={h} style={{textAlign:'left',padding:'8px 10px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {SUCURSALES.map((s,i)=>{
+                          const r = acumData[s.k]
+                          const neto = r?.neto ?? 0
+                          const estCol = neto < -10000 ? '#C00000' : neto < -3000 ? '#EF9F27' : '#3B6D11'
+                          return (
+                            <tr key={s.k} style={{background:i%2?'#f9f9f9':'#fff'}}>
+                              <td style={{padding:'8px 10px',fontWeight:600}}>{s.n}</td>
+                              <td style={{padding:'8px 10px',color:'#C00000',fontWeight:600}}>{fmt(r?.faltante||0)}</td>
+                              <td style={{padding:'8px 10px',color:'#3B6D11',fontWeight:600}}>{fmt(r?.sobrante||0)}</td>
+                              <td style={{padding:'8px 10px',fontWeight:700,color:estCol}}>{fmt(neto)}</td>
+                              <td style={{padding:'8px 10px'}}>
+                                <button
+                                  style={{padding:'4px 10px',borderRadius:6,border:'1px solid #ddd',background:'#fff',cursor:'pointer',fontSize:11,fontWeight:500}}
+                                  onClick={()=>setAcumSucDetalle(acumSucDetalle===s.k?null:s.k)}
+                                >{acumSucDetalle===s.k?'Ocultar':'Ver semanas'}</button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                        {/* Totales */}
+                        <tr style={{background:'#f0f4ff',fontWeight:700}}>
+                          <td style={{padding:'8px 10px'}}>TOTAL CADENA</td>
+                          <td style={{padding:'8px 10px',color:'#C00000'}}>{fmt(Object.values(acumData).reduce((a,r)=>a+(r?.faltante||0),0))}</td>
+                          <td style={{padding:'8px 10px',color:'#3B6D11'}}>{fmt(Object.values(acumData).reduce((a,r)=>a+(r?.sobrante||0),0))}</td>
+                          <td style={{padding:'8px 10px',color:'#002060'}}>{fmt(Object.values(acumData).reduce((a,r)=>a+(r?.neto||0),0))}</td>
+                          <td></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Detalle por semana de la sucursal seleccionada */}
+                {acumSucDetalle && (() => {
+                  const nombreSuc = SUCURSALES.find(s=>s.k===acumSucDetalle)?.n
+                  const semanas = acumData[acumSucDetalle]?.semanas || []
+                  return (
+                    <div style={st.card}>
+                      <div style={{fontWeight:600,fontSize:14,marginBottom:12,color:'#555'}}>
+                        {nombreSuc} — Detalle por semana
+                      </div>
+                      <div style={{overflowX:'auto'}}>
+                        <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                          <thead>
+                            <tr>
+                              {['Semana','Faltante ($)','Sobrante ($)','Impacto neto ($)'].map(h=>(
+                                <th key={h} style={{textAlign:'left',padding:'7px 10px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12}}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {semanas.map((r,i)=>{
+                              const neto = r?.neto ?? null
+                              const estCol = neto===null?'#888':neto<-2000?'#C00000':neto<-500?'#EF9F27':'#3B6D11'
+                              return (
+                                <tr key={r.semana} style={{background:i%2?'#f9f9f9':'#fff'}}>
+                                  <td style={{padding:'7px 10px',fontWeight:600}}>Semana {r.semana}</td>
+                                  <td style={{padding:'7px 10px',color:'#C00000'}}>{r?.faltante!=null?fmt(r.faltante):'—'}</td>
+                                  <td style={{padding:'7px 10px',color:'#3B6D11'}}>{r?.sobrante!=null?fmt(r.sobrante):'—'}</td>
+                                  <td style={{padding:'7px 10px',fontWeight:600,color:estCol}}>{neto!=null?fmt(neto):'Sin datos'}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </>
+            )}
+          </>
+        )}
+
       </div>
     </div>
   )
