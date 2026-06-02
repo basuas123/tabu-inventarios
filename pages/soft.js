@@ -119,10 +119,13 @@ export default function SoftPage() {
 
           productos[desc] = { existencia: exist, fisico, costo, unidad: unid, grupo, difUnd: difReal, difImp: impReal, existValida }
 
-          if (existValida && Math.abs(difReal) > 0.001) {
-            if (impReal < 0) totalFaltante += impReal
-            else if (impReal > 0) totalSobrante += impReal
-            detalleProductos.push({ desc, difUnd: difReal, difImp: impReal, costo, grupo: '' })
+          if (existValida) {
+            if (Math.abs(difReal) > 0.001) {
+              if (impReal < 0) totalFaltante += impReal
+              else if (impReal > 0) totalSobrante += impReal
+            }
+            // Guardar TODOS los productos (con y sin diferencia) para exportar a Soft
+            detalleProductos.push({ desc, difUnd: difReal, difImp: impReal, costo, grupo: '', fisico, exist })
           }
         }
 
@@ -134,10 +137,12 @@ export default function SoftPage() {
             neto: totalFaltante + totalSobrante,
             items: detalleProductos.length,
             detalle: detalleProductos.map(p => ({
-              nombre: p.desc, grupo: p.grupo, fisico: p.difUnd + (productos[p.desc]?.existencia||0),
-              sistema: productos[p.desc]?.existencia || 0,
+              nombre: p.desc, grupo: p.grupo, 
+              fisico: p.fisico ?? (p.difUnd + (productos[p.desc]?.existencia||0)),
+              sistema: p.exist ?? (productos[p.desc]?.existencia || 0),
+              unidad: productos[p.desc]?.unidad || '',
               dif: p.difUnd, imp: p.difImp, costo: p.costo,
-              resultado: p.difImp < 0 ? 'FALTANTE' : 'SOBRANTE'
+              resultado: Math.abs(p.difImp) < 0.001 ? 'OK' : p.difImp < 0 ? 'FALTANTE' : 'SOBRANTE'
             }))
           }
           // Guardar análisis en Supabase inmediatamente
@@ -186,7 +191,7 @@ export default function SoftPage() {
       if (!prod.existValida) return  // ignorar existencias negativas en Soft
       const dif = prod.difUnd || 0
       const imp = prod.difImp || 0
-      if (Math.abs(dif) < 0.001) return  // sin diferencia significativa
+      // Incluir todos los productos (con y sin diferencia)
 
       if (imp < 0) totalFalt += imp
       else         totalSobr += imp
