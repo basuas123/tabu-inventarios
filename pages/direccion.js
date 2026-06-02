@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { exportarResumenDireccion, exportarRevisionCobro, exportarParaSoft, imprimir } from '../lib/exportar'
+import { exportarResumenDireccion, exportarRevisionCobro, exportarParaSoft, exportarCobro, imprimir } from '../lib/exportar'
 
 const MERMAS = {
   'PESCADOS Y MARISCOS':0.15,'CARNES Y AVES':0.12,'FRUTAS Y VERDURAS':0.20,
@@ -483,6 +483,16 @@ export default function DireccionPage() {
                                 style={{width:80,padding:'4px 6px',border:'1px solid #ddd',borderRadius:6,fontSize:11,textAlign:'center'}}
                                 defaultValue={revisiones.find(rv=>rv.sucursal===(SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision)&&rv.producto===r.nombre)?.cantidad_ajustada??''}
                                 placeholder={parseFloat(r.fisico??0).toFixed(3)}
+                                data-ajuste-id={r.nombre}
+                                onKeyDown={e=>{
+                                  if(e.key==='Enter'){
+                                    e.preventDefault()
+                                    const inputs = Array.from(document.querySelectorAll('input[data-ajuste-id]'))
+                                    const idx = inputs.findIndex(el=>el.dataset.ajusteId===r.nombre)
+                                    if(idx>=0 && idx<inputs.length-1) inputs[idx+1].focus()
+                                    else e.target.blur()
+                                  }
+                                }}
                                 onBlur={async e=>{
                                   const suc = SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision
                                   const val = e.target.value===''?null:parseFloat(e.target.value)
@@ -652,7 +662,7 @@ export default function DireccionPage() {
                     <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                       <thead>
                         <tr>
-                          {['Producto','Diferencia','Monto ($)','Notas'].map(h=>(
+                          {['Producto','Diferencia','Monto ($)','Notas','Acción'].map(h=>(
                             <th key={h} style={{textAlign:'left',padding:'7px 10px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12}}>{h}</th>
                           ))}
                         </tr>
@@ -666,13 +676,27 @@ export default function DireccionPage() {
                             </td>
                             <td style={{padding:'7px 10px',fontWeight:700,color:'#C00000'}}>{fmt(Math.abs(r.impacto||0))}</td>
                             <td style={{padding:'7px 10px',color:'#888',fontSize:12}}>{r.notas||'—'}</td>
+                            <td style={{padding:'7px 10px'}}>
+                              <button
+                                style={{padding:'4px 10px',borderRadius:6,border:'none',background:'#002060',color:'#fff',cursor:'pointer',fontSize:11,fontWeight:600}}
+                                onClick={async ()=>{
+                                  if(!confirm('¿Confirmar cobro de '+r.producto+'?')) return
+                                  await fetch('/api/revisiones',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:r.id,estatus:'CORREGIDO',notas:(r.notas?r.notas+' | ':'')+' Cobrado sem '+semana})})
+                                  await cargarDatos()
+                                }}
+                              >✓ Cobrado</button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
 
-                    {/* Total */}
-                    <div style={{display:'flex',justifyContent:'flex-end',marginTop:12,paddingTop:10,borderTop:'1px solid #eee'}}>
+                    {/* Total + Exportar */}
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12,paddingTop:10,borderTop:'1px solid #eee'}}>
+                      <button
+                        style={{padding:'7px 14px',borderRadius:7,border:'none',background:'#C00000',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}
+                        onClick={()=>exportarCobro({sucursal:nombreSuc,items:itemsSuc,total:totalSuc,semana,año:new Date().getFullYear()})}
+                      >📄 Exportar comprobante</button>
                       <div style={{fontWeight:700,fontSize:15}}>
                         Total a cobrar: <span style={{color:'#C00000'}}>{fmt(totalSuc)}</span>
                       </div>
