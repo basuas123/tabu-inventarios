@@ -133,7 +133,7 @@ export default function SoftPage() {
             totalSobr: totalSobrante,
             neto: totalFaltante + totalSobrante,
             items: detalleProductos.length,
-            detalle: detalleProductos.slice(0,100).map(p => ({
+            detalle: detalleProductos.map(p => ({
               nombre: p.desc, grupo: p.grupo, fisico: p.difUnd + (productos[p.desc]?.existencia||0),
               sistema: productos[p.desc]?.existencia || 0,
               dif: p.difUnd, imp: p.difImp, costo: p.costo,
@@ -217,7 +217,7 @@ export default function SoftPage() {
       resultados: {
         totalFalt, totalSobr, neto,
         items: resultados.length,
-        detalle: resultados.slice(0, 150),
+        detalle: resultados,
       }
     }
     fetch('/api/analisis', {
