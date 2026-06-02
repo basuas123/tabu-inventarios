@@ -447,7 +447,7 @@ export default function DireccionPage() {
                       onClick={()=>{
                         const suc = SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision
                         const revSuc = revisiones.filter(r=>r.sucursal===suc&&r.estatus==='CORREGIDO')
-                        exportarParaSoft({sucursal:suc, revisiones:revSuc, semana, año:new Date().getFullYear()})
+                        exportarParaSoft({sucursal:suc, revisiones:revSuc, analisisSuc, semana, año:new Date().getFullYear()})
                       }}
                     >📤 Exportar para Soft</button>
                   </div>
