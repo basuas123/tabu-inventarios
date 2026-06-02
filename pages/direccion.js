@@ -652,82 +652,104 @@ export default function DireccionPage() {
         {tab === 'historial' && (
           <>
             <div style={st.card}>
-              <div style={{fontWeight:600,fontSize:14,marginBottom:16}}>
-                Historial de inventarios — últimas 4 semanas
+              {/* Selector de sucursal */}
+              <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
+                <div style={{fontWeight:600,fontSize:14}}>Ver historial de:</div>
+                <select
+                  style={{padding:'7px 12px',border:'1px solid #ddd',borderRadius:8,fontSize:13,flex:1,maxWidth:280}}
+                  value={sucRevision}
+                  onChange={e=>setSucRevision(e.target.value)}
+                >
+                  <option value="">Selecciona una sucursal...</option>
+                  {SUCURSALES.map(s=><option key={s.k} value={s.k}>{s.n}</option>)}
+                </select>
               </div>
 
-              {historial.length === 0 ? (
+              {!sucRevision ? (
                 <div style={{textAlign:'center',padding:30,color:'#888',fontSize:13}}>
-                  No hay datos históricos. Los inventarios se guardan automáticamente cada semana.
+                  Selecciona una sucursal para ver su historial.
+                </div>
+              ) : historial.length === 0 ? (
+                <div style={{textAlign:'center',padding:30,color:'#888',fontSize:13}}>
+                  No hay datos históricos aún.
                 </div>
               ) : (
-                <div style={{display:'flex',gap:10,marginBottom:20,flexWrap:'wrap'}}>
-                  {historial.map(h => (
-                    <button
-                      key={h.semana}
-                      onClick={()=>verSemana(h.semana)}
-                      style={{
-                        padding:'10px 20px', borderRadius:8, cursor:'pointer', fontSize:13, fontWeight:600,
-                        background: semanaVer===h.semana ? '#002060' : '#f5f5f5',
-                        color: semanaVer===h.semana ? '#fff' : '#333',
-                        border: semanaVer===h.semana ? 'none' : '1px solid #ddd',
-                      }}
-                    >
-                      Semana {h.semana}
-                      <span style={{display:'block',fontSize:11,fontWeight:400,opacity:0.8}}>
-                        {h.data.length} sucursal{h.data.length!==1?'es':''}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {semanaVer && (
                 <>
-                  <div style={{fontWeight:600,fontSize:13,marginBottom:12,color:'#555'}}>
-                    Semana {semanaVer} — Resumen por sucursal
+                  {/* Botones de semana */}
+                  <div style={{display:'flex',gap:10,marginBottom:20,flexWrap:'wrap'}}>
+                    {historial.map(h => (
+                      <button
+                        key={h.semana}
+                        onClick={()=>verSemana(h.semana)}
+                        style={{
+                          padding:'10px 20px',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:600,
+                          background:semanaVer===h.semana?'#002060':'#f5f5f5',
+                          color:semanaVer===h.semana?'#fff':'#333',
+                          border:semanaVer===h.semana?'none':'1px solid #ddd',
+                        }}
+                      >
+                        Semana {h.semana}
+                        <span style={{display:'block',fontSize:11,fontWeight:400,opacity:0.8}}>
+                          {h.data.length} sucursal{h.data.length!==1?'es':''}
+                        </span>
+                      </button>
+                    ))}
                   </div>
-                  <div style={{overflowX:'auto'}}>
-                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                      <thead>
-                        <tr>
-                          {['Sucursal','Capturados','Pérdida ($)','Sobrante ($)','Impacto neto ($)','Estado','Responsable'].map(h=>(
-                            <th key={h} style={{textAlign:'left',padding:'8px 10px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12}}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {SUCURSALES.map((s,i) => {
-                          const r = resumenHist[s.k]
-                          const neto = r?.neto ?? null
-                          const estCol = !r?'#888':neto===null?'#888':neto<-2000?'#C00000':neto<-500?'#EF9F27':'#3B6D11'
-                          const estBg2 = !r?'#f5f5f5':neto===null?'#f5f5f5':neto<-2000?'#FCEBEB':neto<-500?'#FAEEDA':'#EAF3DE'
-                          const estado = !r?'Sin datos':neto===null?'Sin Soft':neto<-2000?'CRÍTICA':neto<-500?'REVISAR':'OK'
-                          return (
-                            <tr key={s.k} style={{background:i%2?'#f9f9f9':'#fff'}}>
-                              <td style={{padding:'8px 10px',fontWeight:600}}>{s.n}</td>
-                              <td style={{padding:'8px 10px',color:'#555'}}>{r?`${r.capturados||0}/${r.total||0}`:'—'}</td>
-                              <td style={{padding:'8px 10px',color:'#C00000',fontWeight:r?.faltante?600:400}}>
-                                {r?.faltante!==null&&r?.faltante!==undefined?fmt(r.faltante):'—'}
-                              </td>
-                              <td style={{padding:'8px 10px',color:'#3B6D11',fontWeight:r?.sobrante?600:400}}>
-                                {r?.sobrante!==null&&r?.sobrante!==undefined?fmt(r.sobrante):'—'}
-                              </td>
-                              <td style={{padding:'8px 10px',fontWeight:600,color:estCol}}>
-                                {neto!==null?fmt(neto):'—'}
-                              </td>
-                              <td style={{padding:'8px 10px'}}>
-                                <span style={{background:estBg2,color:estCol,padding:'2px 8px',borderRadius:100,fontSize:11,fontWeight:700}}>
-                                  {estado}
-                                </span>
-                              </td>
-                              <td style={{padding:'8px 10px',color:'#888',fontSize:12}}>{r?.responsable||'—'}</td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+
+                  {/* Detalle de la sucursal seleccionada para la semana elegida */}
+                  {semanaVer && (() => {
+                    const nombreSuc = SUCURSALES.find(s=>s.k===sucRevision)?.n
+                    const r = resumenHist[sucRevision]
+                    const neto = r?.neto ?? null
+                    const estCol = !r?'#888':neto===null?'#888':neto<-2000?'#C00000':neto<-500?'#EF9F27':'#3B6D11'
+                    const estBg2 = !r?'#f5f5f5':neto===null?'#f5f5f5':neto<-2000?'#FCEBEB':neto<-500?'#FAEEDA':'#EAF3DE'
+                    const estado = !r?'Sin datos':neto===null?'Sin Soft':neto<-2000?'CRÍTICA':neto<-500?'REVISAR':'OK'
+                    return (
+                      <div style={{background:'#f9f9f9',borderRadius:10,padding:'16px 20px'}}>
+                        <div style={{fontWeight:600,fontSize:14,marginBottom:14}}>
+                          {nombreSuc} — Semana {semanaVer}
+                        </div>
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:12}}>
+                          <div style={{background:'#FCEBEB',borderRadius:8,padding:'10px 14px'}}>
+                            <div style={{fontSize:11,color:'#888',marginBottom:3}}>Pérdida ($)</div>
+                            <div style={{fontSize:18,fontWeight:700,color:'#C00000'}}>
+                              {r?.faltante!=null?fmt(r.faltante):'—'}
+                            </div>
+                          </div>
+                          <div style={{background:'#EAF3DE',borderRadius:8,padding:'10px 14px'}}>
+                            <div style={{fontSize:11,color:'#888',marginBottom:3}}>Sobrante ($)</div>
+                            <div style={{fontSize:18,fontWeight:700,color:'#3B6D11'}}>
+                              {r?.sobrante!=null?fmt(r.sobrante):'—'}
+                            </div>
+                          </div>
+                          <div style={{background:'#FFF2CC',borderRadius:8,padding:'10px 14px'}}>
+                            <div style={{fontSize:11,color:'#888',marginBottom:3}}>Impacto neto</div>
+                            <div style={{fontSize:18,fontWeight:700,color:estCol}}>
+                              {neto!=null?fmt(neto):'—'}
+                            </div>
+                          </div>
+                          <div style={{background:'#f5f5f5',borderRadius:8,padding:'10px 14px'}}>
+                            <div style={{fontSize:11,color:'#888',marginBottom:3}}>Capturados</div>
+                            <div style={{fontSize:18,fontWeight:700}}>
+                              {r?`${r.capturados||0}/${r.total||0}`:'—'}
+                            </div>
+                          </div>
+                          <div style={{background:estBg2,borderRadius:8,padding:'10px 14px'}}>
+                            <div style={{fontSize:11,color:'#888',marginBottom:3}}>Estado</div>
+                            <div style={{fontSize:16,fontWeight:700,color:estCol}}>{estado}</div>
+                          </div>
+                        </div>
+                        {r?.responsable && (
+                          <div style={{fontSize:12,color:'#888'}}>Responsable: {r.responsable}</div>
+                        )}
+                        {!r && (
+                          <div style={{textAlign:'center',color:'#888',fontSize:13,padding:20}}>
+                            Sin datos para esta sucursal en la semana {semanaVer}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </>
               )}
             </div>
