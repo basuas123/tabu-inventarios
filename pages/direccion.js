@@ -569,37 +569,6 @@ export default function DireccionPage() {
             </div>
 
             {/* Cobros */}
-            <div style={st.card}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-                <div style={{fontWeight:600,fontSize:14}}>Cobro autorizado — semana {semana}</div>
-                <div style={{fontSize:22,fontWeight:700,color:'#C00000'}}>{fmt(totalCobro)}</div>
-              </div>
-              {cobros.length === 0 ? (
-                <div style={{textAlign:'center',padding:20,color:'#888',fontSize:13}}>Sin cobros autorizados esta semana</div>
-              ) : (
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                  <thead>
-                    <tr>
-                      {['Sucursal','Producto','Monto ($)','Autorizado por'].map(h=>(
-                        <th key={h} style={{textAlign:'left',padding:'7px 10px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12}}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cobros.map((r,i)=>(
-                      <tr key={r.id||i} style={{background:i%2?'#f9f9f9':'#fff'}}>
-                        <td style={{padding:'7px 10px',fontWeight:600}}>{r.sucursal}</td>
-                        <td style={{padding:'7px 10px'}}>{r.producto}</td>
-                        <td style={{padding:'7px 10px',fontWeight:700,color:'#C00000'}}>{fmt(Math.abs(r.impacto))}</td>
-                        <td style={{padding:'7px 10px',color:'#888'}}>Directora de Inventarios</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </>
-        )}
 
         {tab === 'cobros' && (
           <>
