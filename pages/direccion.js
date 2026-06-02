@@ -695,7 +695,15 @@ export default function DireccionPage() {
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12,paddingTop:10,borderTop:'1px solid #eee'}}>
                       <button
                         style={{padding:'7px 14px',borderRadius:7,border:'none',background:'#C00000',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}
-                        onClick={()=>exportarCobro({sucursal:nombreSuc,items:itemsSuc,total:totalSuc,semana,año:new Date().getFullYear()})}
+                        onClick={()=>{
+                        // Enriquecer items con dif y unidad del análisis Soft
+                        const detalle = analisisSuc?.detalle || []
+                        const itemsEnriquecidos = itemsSuc.map(r => {
+                          const softProd = detalle.find(d => d.nombre === r.producto || d.nombre?.toUpperCase() === r.producto?.toUpperCase())
+                          return { ...r, dif: softProd?.dif ?? null, unidad: softProd?.unidad || '' }
+                        })
+                        exportarCobro({sucursal:nombreSuc,items:itemsEnriquecidos,total:totalSuc,semana,año:new Date().getFullYear()})
+                      }}
                       >📄 Exportar comprobante</button>
                       <div style={{fontWeight:700,fontSize:15}}>
                         Total a cobrar: <span style={{color:'#C00000'}}>{fmt(totalSuc)}</span>
