@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
-import productosDB from '../lib/productos.json'
 import { exportarInventarioSucursal, imprimir } from '../lib/exportar'
 
 function getWeek() {
@@ -27,8 +26,13 @@ export default function InventarioPage() {
     const u = JSON.parse(stored)
     if (u.rol === 'dir') { router.push('/direccion'); return }
     setUser(u)
-    const prods = productosDB[u.key]?.productos || []
-    setProductos(prods)
+    // Cargar productos via API para no pesar en el cliente
+    fetch('/api/productos?sucursal=' + u.key)
+      .then(r => r.json())
+      .then(({ productos: prods }) => {
+        if (prods) setProductos(prods)
+      })
+      .catch(() => setProductos([]))
     // Cargar cantidades — primero Supabase, luego localStorage como fallback
     const resp = localStorage.getItem('resp_' + u.key)
     if (resp) setResponsable(resp)

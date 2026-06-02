@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import productosDB from '../lib/productos.json'
 import { exportarResumenDireccion, imprimir } from '../lib/exportar'
 
 const MERMAS = {
@@ -39,10 +38,9 @@ function fmt(n) {
   return '$' + Math.abs(n).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function calcularImpacto(sucKey, datos, analisisData) {
-  const prods = productosDB[sucKey]?.productos || []
+function calcularImpacto(sucKey, datos, analisisData, totalProds) {
   const capturados = datos ? Object.keys(datos).filter(k => datos[k] !== '' && datos[k] !== undefined).length : 0
-  const total = prods.length
+  const total = totalProds || 0
 
   // Si hay análisis real (Soft cargado), usar esos números
   // analisisData ES directamente el objeto resultados de Supabase
