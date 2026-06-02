@@ -33,6 +33,14 @@ export default function InventarioPage() {
     const resp = localStorage.getItem('resp_' + u.key)
     if (resp) setResponsable(resp)
 
+    // Cargar revisiones pendientes de esta sucursal
+    fetch('/api/revisiones?sucursal=' + u.key)
+      .then(r => r.json())
+      .then(({ data }) => {
+        if (data) setRevisiones(data.filter(r => r.estatus === 'EN REVISIÓN' || r.estatus === 'CONFIRMADO'))
+      })
+      .catch(() => {})
+
     fetch('/api/inventario?sucursal=' + u.key + '&semana=' + getWeek() + '&año=' + new Date().getFullYear())
       .then(r => r.json())
       .then(({ data }) => {
@@ -186,6 +194,9 @@ export default function InventarioPage() {
         <div style={st.tabs}>
           <button style={st.tab(tab==='captura')} onClick={()=>setTab('captura')}>Captura</button>
           <button style={st.tab(tab==='resumen')} onClick={()=>setTab('resumen')}>Resumen</button>
+          <button style={st.tab(tab==='revisiones')} onClick={()=>setTab('revisiones')}>
+            {revisiones.length > 0 ? `⚠ Revisiones (${revisiones.length})` : 'Revisiones'}
+          </button>
         </div>
 
         {tab === 'captura' && (
@@ -275,6 +286,51 @@ export default function InventarioPage() {
               })
             )}
           </>
+        )}
+
+        {tab === 'revisiones' && (
+          <div style={{paddingBottom:20}}>
+            {revisiones.length === 0 ? (
+              <div style={{textAlign:'center',padding:40,color:'#888',fontSize:13}}>
+                Sin productos en revisión o confirmados por dirección.
+              </div>
+            ) : (
+              <>
+                <div style={{background:'#FAEEDA',borderRadius:8,padding:'12px 14px',marginBottom:14,fontSize:13,color:'#854F0B'}}>
+                  ⚠ Dirección solicita que revises los siguientes productos y confirmes las cantidades.
+                </div>
+                <div style={{background:'#fff',borderRadius:10,border:'1px solid #eee',overflow:'hidden'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                    <thead>
+                      <tr>
+                        {['Producto','Impacto ($)','Estatus','Notas'].map(h=>(
+                          <th key={h} style={{textAlign:'left',padding:'9px 12px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12,background:'#f9f9f9'}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {revisiones.map((r,i)=>(
+                        <tr key={i} style={{background:i%2?'#f9f9f9':'#fff'}}>
+                          <td style={{padding:'9px 12px',fontWeight:600}}>{r.producto}</td>
+                          <td style={{padding:'9px 12px',color:'#C00000',fontWeight:600}}>
+                            {r.impacto ? ('$'+Math.abs(r.impacto).toLocaleString('es-MX',{minimumFractionDigits:2})) : '—'}
+                          </td>
+                          <td style={{padding:'9px 12px'}}>
+                            <span style={{
+                              background: r.estatus==='EN REVISIÓN'?'#FAEEDA':'#FCEBEB',
+                              color: r.estatus==='EN REVISIÓN'?'#854F0B':'#C00000',
+                              padding:'2px 8px',borderRadius:100,fontSize:11,fontWeight:700
+                            }}>{r.estatus}</span>
+                          </td>
+                          <td style={{padding:'9px 12px',color:'#888',fontSize:12}}>{r.notas||'—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
         )}
 
         {tab === 'resumen' && (

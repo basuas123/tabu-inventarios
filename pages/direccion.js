@@ -80,6 +80,7 @@ export default function DireccionPage() {
   const [tab, setTab]           = useState('sucursales')
   const [resumen, setResumen]   = useState({})
   const [revisiones, setRevisiones] = useState([])
+  const [cobros, setCobros]           = useState([])
   const [sucRevision, setSucRevision] = useState('')
   const [analisisSuc, setAnalisisSuc]   = useState(null)
   const [historial, setHistorial]       = useState([])
@@ -176,9 +177,13 @@ export default function DireccionPage() {
     try {
       const res = await fetch('/api/revisiones')
       const { data } = await res.json()
-      if (data) setRevisiones(data)
+      if (data) {
+        setRevisiones(data)
+        setCobros(data.filter(r => r.estatus === 'A COBRO'))
+      }
     } catch (e) {
       setRevisiones([])
+      setCobros([])
     }
 
     setLoading(false)
@@ -336,6 +341,9 @@ export default function DireccionPage() {
         <div style={st.tabs}>
           <button style={st.tab(tab==='sucursales')} onClick={()=>setTab('sucursales')}>Sucursales</button>
           <button style={st.tab(tab==='revision')}   onClick={()=>setTab('revision')}>Revisión y cobro</button>
+          <button style={st.tab(tab==='cobros')}    onClick={()=>setTab('cobros')}>
+            {cobros.length>0?'💰 A cobrar ('+cobros.length+')':'A cobrar'}
+          </button>
           <button style={st.tab(tab==='historial')}  onClick={()=>{setTab('historial');cargarHistorial()}}>Historial</button>
         </div>
 
@@ -584,6 +592,74 @@ export default function DireccionPage() {
                     ))}
                   </tbody>
                 </table>
+              )}
+            </div>
+          </>
+        )}
+
+        {tab === 'cobros' && (
+          <>
+            {/* Resumen por sucursal */}
+            <div style={st.card}>
+              <div style={{fontWeight:600,fontSize:15,marginBottom:16}}>
+                💰 Total a cobrar por sucursal — Semana {semana}
+              </div>
+
+              {cobros.length === 0 ? (
+                <div style={{textAlign:'center',padding:30,color:'#888',fontSize:13}}>
+                  Sin productos marcados "A cobro" esta semana.
+                  <br/><span style={{fontSize:12}}>Ve a Revisión y cobro y marca productos como "A cobro".</span>
+                </div>
+              ) : (
+                <>
+                  {/* Agrupar por sucursal */}
+                  {(() => {
+                    const porSucursal = {}
+                    cobros.forEach(r => {
+                      if (!porSucursal[r.sucursal]) porSucursal[r.sucursal] = { items:[], total:0 }
+                      porSucursal[r.sucursal].items.push(r)
+                      porSucursal[r.sucursal].total += Math.abs(r.impacto||0)
+                    })
+                    const totalGeneral = Object.values(porSucursal).reduce((a,s)=>a+s.total,0)
+                    return (
+                      <>
+                        {/* KPI total general */}
+                        <div style={{background:'#FCEBEB',borderRadius:10,padding:'16px 20px',marginBottom:20,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                          <div style={{fontWeight:600,fontSize:14,color:'#C00000'}}>TOTAL GENERAL A COBRAR</div>
+                          <div style={{fontSize:28,fontWeight:700,color:'#C00000'}}>{fmt(totalGeneral)}</div>
+                        </div>
+
+                        {/* Por sucursal */}
+                        {Object.entries(porSucursal).sort((a,b)=>b[1].total-a[1].total).map(([suc,data])=>(
+                          <div key={suc} style={{...st.card,marginBottom:12}}>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                              <div style={{fontWeight:700,fontSize:14}}>{suc}</div>
+                              <div style={{fontSize:20,fontWeight:700,color:'#C00000'}}>{fmt(data.total)}</div>
+                            </div>
+                            <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                              <thead>
+                                <tr>
+                                  {['Producto','Diferencia','Monto ($)'].map(h=>(
+                                    <th key={h} style={{textAlign:'left',padding:'5px 8px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600}}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {data.items.map((r,i)=>(
+                                  <tr key={i} style={{background:i%2?'#f9f9f9':'#fff'}}>
+                                    <td style={{padding:'6px 8px',fontWeight:500}}>{r.producto}</td>
+                                    <td style={{padding:'6px 8px',color:'#C00000'}}>{r.impacto ? r.impacto.toFixed(3) : '—'}</td>
+                                    <td style={{padding:'6px 8px',fontWeight:700,color:'#C00000'}}>{fmt(Math.abs(r.impacto||0))}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+                      </>
+                    )
+                  })()}
+                </>
               )}
             </div>
           </>
