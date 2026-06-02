@@ -156,8 +156,8 @@ export default function InventarioPage() {
   let totFalt = 0, totSobr = 0, diffs = []
   productos.forEach(p => {
     const f = parseFloat(cantidades[p.id]) || 0
-    if (f === 0 && cantidades[p.id] === undefined) return
-    const sistema = f * (0.85 + Math.random() * 0.3) // placeholder hasta cargar Soft
+    if (f === 0 && if (cantidades[p.id] === undefined) return
+    const ajustado = f   const sistema  = 0          // pendiente: integrar Soft Restaurant
     const dif = f - sistema
     const imp = dif * (p.costo || 0)
     if (Math.abs(dif) > 0.01) {
