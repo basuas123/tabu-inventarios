@@ -316,8 +316,10 @@ export default function DireccionPage() {
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <span style={{fontSize:12,color:'#666'}}>Semana {semana} · {new Date().toLocaleDateString('es-MX')}</span>
           <button style={st.btn} onClick={()=>router.push('/soft')}>📊 Cargar Soft</button>
-          <button style={st.btn} onClick={()=>{
-            if (tab === 'revision') {
+          <button style={st.btn} data-tab={tab} onClick={(e)=>{
+            const t = e.currentTarget.dataset.tab
+            console.log("TAB:", t)
+            if (t === "revision") {
               const sucNombre = SUCURSALES.find(s=>s.k===sucRevision)?.n || sucRevision
               const revFiltradas = sucRevision ? revisiones.filter(r => r.sucursal === sucNombre) : revisiones
               exportarRevisionCobro({ sucursal: sucNombre, analisisSuc, revisiones: revFiltradas, semana, año: new Date().getFullYear() })
