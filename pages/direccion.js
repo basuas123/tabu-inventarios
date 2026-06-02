@@ -172,6 +172,7 @@ export default function DireccionPage() {
   const [acumSucDetalle, setAcumSucDetalle] = useState(null)
   const semanasDisponibles = Array.from({length:semana},(_,i)=>i+1)
   const semanasDesdeIni = semanasDisponibles.filter(s => s >= acumSemIni)
+  const totalSemanasRango = acumSemFin - acumSemIni + 1
   const semanaActual = semana
   const [semanaFiltro, setSemanaFiltro] = useState(getWeek())
   const [resumenFiltro, setResumenFiltro] = useState({})
@@ -997,7 +998,7 @@ export default function DireccionPage() {
                 {/* Tabla resumen acumulado */}
                 <div style={st.card}>
                   <div style={{fontWeight:600,fontSize:14,marginBottom:12,color:'#555'}}>
-                    Resumen semanas {acumSemIni}–{acumSemFin} · {acumSemFin - acumSemIni + 1} semanas
+                    Resumen semanas {acumSemIni}–{acumSemFin} · {totalSemanasRango} semanas
                   </div>
                   <div style={{overflowX:'auto'}}>
                     <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
