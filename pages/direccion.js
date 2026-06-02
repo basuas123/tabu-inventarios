@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { exportarResumenDireccion, imprimir } from '../lib/exportar'
+import { exportarResumenDireccion, exportarRevisionCobro, imprimir } from '../lib/exportar'
 
 const MERMAS = {
   'PESCADOS Y MARISCOS':0.15,'CARNES Y AVES':0.12,'FRUTAS Y VERDURAS':0.20,
@@ -316,7 +316,15 @@ export default function DireccionPage() {
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <span style={{fontSize:12,color:'#666'}}>Semana {semana} · {new Date().toLocaleDateString('es-MX')}</span>
           <button style={st.btn} onClick={()=>router.push('/soft')}>📊 Cargar Soft</button>
-          <button style={st.btn} onClick={()=>exportarResumenDireccion({sucursales:SUCURSALES,resumen,semana,año:new Date().getFullYear()})}>📥 Excel</button>
+          <button style={st.btn} onClick={()=>{
+            if (tab === 'revision') {
+              const sucNombre = SUCURSALES.find(s=>s.k===sucRevision)?.n || sucRevision
+              const revFiltradas = sucRevision ? revisiones.filter(r => r.sucursal === sucNombre) : revisiones
+              exportarRevisionCobro({ sucursal: sucNombre, analisisSuc, revisiones: revFiltradas, semana, año: new Date().getFullYear() })
+            } else {
+              exportarResumenDireccion({sucursales:SUCURSALES,resumen,semana,año:new Date().getFullYear()})
+            }
+          }}>📥 Excel</button>
           <button style={st.btn} onClick={imprimir}>🖨 Imprimir</button>
           <button style={st.btn} onClick={cargarDatos}>↻ Actualizar</button>
           <button style={st.btn} onClick={logout}>Salir</button>
