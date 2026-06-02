@@ -316,6 +316,19 @@ export default function DireccionPage() {
     sem:    v => { const c = v===null?'#ccc':v<-2000?'#C00000':v<-500?'#EF9F27':'#639922'; return {width:10,height:10,borderRadius:'50%',background:c,display:'inline-block',marginRight:6} },
   }
 
+  function colorNeto(neto, umbral1, umbral2) {
+    if (neto === null || neto === undefined) return '#888'
+    if (neto + umbral1 < 0) return '#C00000'
+    if (neto + umbral2 < 0) return '#EF9F27'
+    return '#3B6D11'
+  }
+  function estadoNeto(neto) {
+    if (neto === null || neto === undefined) return 'Sin datos'
+    if (neto + 2000 < 0) return 'CRÍTICA'
+    if (neto + 500 < 0) return 'REVISAR'
+    return 'OK'
+  }
+
   return (
     <div>
       <div style={st.topbar}>
@@ -960,7 +973,7 @@ export default function DireccionPage() {
                         {SUCURSALES.map((s,i)=>{
                           const r = acumData[s.k]
                           const neto = r?.neto ?? 0
-                          const estCol = neto < -10000 ? '#C00000' : neto < -3000 ? '#EF9F27' : '#3B6D11'
+                          const estCol = colorNeto(neto, 10000, 3000)
                           return (
                             <tr key={s.k} style={{background:i%2?'#f9f9f9':'#fff'}}>
                               <td style={{padding:'8px 10px',fontWeight:600}}>{s.n}</td>
@@ -1010,7 +1023,7 @@ export default function DireccionPage() {
                           <tbody>
                             {semanas.map((r,i)=>{
                               const neto = r?.neto ?? null
-                              const estCol = neto===null?'#888':neto<-2000?'#C00000':neto<-500?'#EF9F27':'#3B6D11'
+                              const estCol = colorNeto(neto, 2000, 500)
                               return (
                                 <tr key={r.semana} style={{background:i%2?'#f9f9f9':'#fff'}}>
                                   <td style={{padding:'7px 10px',fontWeight:600}}>Semana {r.semana}</td>
