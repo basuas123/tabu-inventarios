@@ -72,6 +72,44 @@ function calcularImpacto(sucKey, datos, analisisData, totalProds) {
   return { faltante: null, sobrante: null, neto: null, conDif: 0, capturados, total, tieneAnalisis: false }
 }
 
+function DetalleAcumulado({ sucKey, acumData, sucursales, fmt, colorNeto, card }) {
+  if (!sucKey || !acumData) return null
+  const nombreSuc = sucursales.find(s=>s.k===sucKey)?.n
+  const semanas = acumData[sucKey]?.semanas || []
+  return (
+    <div style={card}>
+      <div style={{fontWeight:600,fontSize:14,marginBottom:12,color:'#555'}}>
+        {nombreSuc} — Detalle por semana
+      </div>
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+          <thead>
+            <tr>
+              {['Semana','Faltante ($)','Sobrante ($)','Impacto neto ($)'].map(h=>(
+                <th key={h} style={{textAlign:'left',padding:'7px 10px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {semanas.map((r,i)=>{
+              const neto = r?.neto ?? null
+              const estCol = colorNeto(neto, 2000, 500)
+              return (
+                <tr key={r.semana} style={{background:i%2?'#f9f9f9':'#fff'}}>
+                  <td style={{padding:'7px 10px',fontWeight:600}}>Semana {r.semana}</td>
+                  <td style={{padding:'7px 10px',color:'#C00000'}}>{r?.faltante!=null?fmt(r.faltante):'—'}</td>
+                  <td style={{padding:'7px 10px',color:'#3B6D11'}}>{r?.sobrante!=null?fmt(r.sobrante):'—'}</td>
+                  <td style={{padding:'7px 10px',fontWeight:600,color:estCol}}>{neto!=null?fmt(neto):'Sin datos'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export default function DireccionPage() {
   const router = useRouter()
   const [user, setUser]         = useState(null)
@@ -1003,42 +1041,14 @@ export default function DireccionPage() {
                 </div>
 
                 {/* Detalle por semana de la sucursal seleccionada */}
-                {acumSucDetalle && (() => {
-                  const nombreSuc = SUCURSALES.find(s=>s.k===acumSucDetalle)?.n
-                  const semanas = acumData[acumSucDetalle]?.semanas || []
-                  return (
-                    <div style={st.card}>
-                      <div style={{fontWeight:600,fontSize:14,marginBottom:12,color:'#555'}}>
-                        {nombreSuc} — Detalle por semana
-                      </div>
-                      <div style={{overflowX:'auto'}}>
-                        <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                          <thead>
-                            <tr>
-                              {['Semana','Faltante ($)','Sobrante ($)','Impacto neto ($)'].map(h=>(
-                                <th key={h} style={{textAlign:'left',padding:'7px 10px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12}}>{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {semanas.map((r,i)=>{
-                              const neto = r?.neto ?? null
-                              const estCol = colorNeto(neto, 2000, 500)
-                              return (
-                                <tr key={r.semana} style={{background:i%2?'#f9f9f9':'#fff'}}>
-                                  <td style={{padding:'7px 10px',fontWeight:600}}>Semana {r.semana}</td>
-                                  <td style={{padding:'7px 10px',color:'#C00000'}}>{r?.faltante!=null?fmt(r.faltante):'—'}</td>
-                                  <td style={{padding:'7px 10px',color:'#3B6D11'}}>{r?.sobrante!=null?fmt(r.sobrante):'—'}</td>
-                                  <td style={{padding:'7px 10px',fontWeight:600,color:estCol}}>{neto!=null?fmt(neto):'Sin datos'}</td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )
-                })()}
+                <DetalleAcumulado
+                  sucKey={acumSucDetalle}
+                  acumData={acumData}
+                  sucursales={SUCURSALES}
+                  fmt={fmt}
+                  colorNeto={colorNeto}
+                  card={st.card}
+                />
               </>
             )}
           </>
