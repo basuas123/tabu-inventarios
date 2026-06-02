@@ -892,7 +892,7 @@ export default function DireccionPage() {
                   value={acumSemFin}
                   onChange={e=>setAcumSemFin(parseInt(e.target.value))}
                 >
-                  {Array.from({length:semana},(_,i)=>i+1).filter(s=>s>=acumSemIni).map(s=>(
+                  {Array.from({length:semana},(_,i)=>i+1).filter(s=>s-acumSemIni>=0).map(s=>(
                     <option key={s} value={s}>Semana {s}{s===semana?' (actual)':''}</option>
                   ))}
                 </select>
