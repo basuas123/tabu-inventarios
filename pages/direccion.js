@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
-import { exportarResumenDireccion, exportarRevisionCobro, imprimir } from '../lib/exportar'
+import { exportarResumenDireccion, exportarRevisionCobro, exportarParaSoft, imprimir } from '../lib/exportar'
 
 const MERMAS = {
   'PESCADOS Y MARISCOS':0.15,'CARNES Y AVES':0.12,'FRUTAS Y VERDURAS':0.20,
@@ -316,10 +316,8 @@ export default function DireccionPage() {
         <div style={{display:'flex',gap:8,alignItems:'center'}}>
           <span style={{fontSize:12,color:'#666'}}>Semana {semana} · {new Date().toLocaleDateString('es-MX')}</span>
           <button style={st.btn} onClick={()=>router.push('/soft')}>📊 Cargar Soft</button>
-          <button style={st.btn} data-tab={tab} onClick={(e)=>{
-            const t = e.currentTarget.dataset.tab
-            console.log("TAB:", t)
-            if (t === "revision") {
+          <button style={st.btn} onClick={()=>{
+            if (tab === 'revision') {
               const sucNombre = SUCURSALES.find(s=>s.k===sucRevision)?.n || sucRevision
               const revFiltradas = sucRevision ? revisiones.filter(r => r.sucursal === sucNombre) : revisiones
               exportarRevisionCobro({ sucursal: sucNombre, analisisSuc, revisiones: revFiltradas, semana, año: new Date().getFullYear() })
@@ -444,11 +442,21 @@ export default function DireccionPage() {
                     </div>
                   </div>
 
+                  <div style={{display:'flex',justifyContent:'flex-end',marginBottom:10}}>
+                    <button style={{padding:'7px 14px',borderRadius:7,border:'none',background:'#002060',color:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}
+                      onClick={()=>{
+                        const suc = SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision
+                        const revSuc = revisiones.filter(r=>r.sucursal===suc&&r.estatus==='CORREGIDO')
+                        exportarParaSoft({sucursal:suc, revisiones:revSuc, semana, año:new Date().getFullYear()})
+                      }}
+                    >📤 Exportar para Soft</button>
+                  </div>
+
                   <div style={{overflowX:'auto'}}>
                     <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
                       <thead>
                         <tr>
-                          {['Producto','Grupo','Diferencia','Impacto ($)','Resultado','Acción'].map(h=>(
+                          {['Producto','Grupo','Diferencia','Impacto ($)','Resultado','Cant. ajustada','Acción'].map(h=>(
                             <th key={h} style={{textAlign:'left',padding:'7px 8px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:11}}>{h}</th>
                           ))}
                         </tr>
@@ -468,6 +476,25 @@ export default function DireccionPage() {
                               <span style={{background:r.resultado==='FALTANTE'?'#FCEBEB':'#EAF3DE',color:r.resultado==='FALTANTE'?'#A32D2D':'#3B6D11',padding:'2px 8px',borderRadius:100,fontSize:11,fontWeight:700}}>
                                 {r.resultado}
                               </span>
+                            </td>
+                            <td style={{padding:'6px 8px'}}>
+                              <input
+                                type="number" min="0" step="0.001"
+                                style={{width:80,padding:'4px 6px',border:'1px solid #ddd',borderRadius:6,fontSize:11,textAlign:'center'}}
+                                defaultValue={revisiones.find(rv=>rv.sucursal===(SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision)&&rv.producto===r.nombre)?.cantidad_ajustada??''}
+                                placeholder={parseFloat(r.fisico??0).toFixed(3)}
+                                onBlur={async e=>{
+                                  const suc = SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision
+                                  const val = e.target.value===''?null:parseFloat(e.target.value)
+                                  const existing = revisiones.find(rev=>rev.sucursal===suc&&rev.producto===r.nombre)
+                                  if (existing) {
+                                    await fetch('/api/revisiones',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:existing.id,cantidad_ajustada:val})})
+                                  } else {
+                                    await fetch('/api/revisiones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sucursal:suc,producto:r.nombre,impacto:r.imp,estatus:'PENDIENTE',cantidad_ajustada:val,notas:'',semana,año:new Date().getFullYear()})})
+                                  }
+                                  await cargarDatos()
+                                }}
+                              />
                             </td>
                             <td style={{padding:'6px 8px'}}>
                               <select
