@@ -567,8 +567,8 @@ export default function DireccionPage() {
                 </div>
               )})()}
             </div>
-
-            {/* Cobros */}
+          </>
+        )}
 
         {tab === 'cobros' && (
           <>
