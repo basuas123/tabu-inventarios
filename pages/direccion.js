@@ -86,6 +86,8 @@ export default function DireccionPage() {
   const [resumenHist, setResumenHist]   = useState({})
   const [loading, setLoading]   = useState(true)
   const [semana] = useState(getWeek())
+  const [semanaFiltro, setSemanaFiltro] = useState(getWeek())
+  const [resumenFiltro, setResumenFiltro] = useState({})
 
   useEffect(() => {
     const stored = localStorage.getItem('tabu_user')
@@ -354,6 +356,39 @@ export default function DireccionPage() {
 
         {tab === 'sucursales' && (
           <div style={st.card}>
+            {/* Selector de semana */}
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
+              <span style={{fontSize:13,fontWeight:600,color:'#555'}}>Ver semana:</span>
+              <select
+                style={{padding:'6px 12px',border:'1px solid #ddd',borderRadius:8,fontSize:13}}
+                value={semanaFiltro}
+                onChange={async e=>{
+                  const s = parseInt(e.target.value)
+                  setSemanaFiltro(s)
+                  if (s === semana) {
+                    setResumenFiltro({})
+                    return
+                  }
+                  const año = new Date().getFullYear()
+                  const [resR, analR] = await Promise.all([
+                    fetch('/api/resumen?semana='+s+'&año='+año).then(r=>r.json()).catch(()=>({data:[]})),
+                    fetch('/api/analisis?semana='+s+'&año='+año).then(r=>r.json()).catch(()=>({data:[]})),
+                  ])
+                  const analMap = {}
+                  if (analR.data) analR.data.forEach(row=>{ analMap[row.sucursal]=row.resultados })
+                  const map = {}
+                  if (resR.data) resR.data.forEach(row=>{
+                    map[row.sucursal] = calcularImpacto(row.sucursal, row.datos, analMap[row.sucursal]) || {}
+                  })
+                  SUCURSALES.forEach(suc=>{ if(!map[suc.k]) map[suc.k]=null })
+                  setResumenFiltro(map)
+                }}
+              >
+                {Array.from({length:semana},(_,i)=>semana-i).map(s=>(
+                  <option key={s} value={s}>Semana {s}{s===semana?' (actual)':''}</option>
+                ))}
+              </select>
+            </div>
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                 <thead>
@@ -365,7 +400,7 @@ export default function DireccionPage() {
                 </thead>
                 <tbody>
                   {SUCURSALES.map((s,i) => {
-                    const r = resumen[s.k]
+                    const r = semanaFiltro === semana ? resumen[s.k] : (resumenFiltro[s.k] ?? null)
                     const neto = r?.neto ?? null
                     const estado = !r ? 'Sin datos' : neto < -2000 ? 'CRÍTICA' : neto < -500 ? 'REVISAR' : 'OK'
                     const estCol = !r ? '#888' : neto < -2000 ? '#C00000' : neto < -500 ? '#EF9F27' : '#3B6D11'
