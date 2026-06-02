@@ -313,7 +313,7 @@ export default function DireccionPage() {
     btnPr:  { padding:'7px 14px', borderRadius:7, border:'none', background:'#002060', color:'#fff', cursor:'pointer', fontSize:13, fontWeight:600 },
     tabs:   { display:'flex', borderBottom:'1px solid #eee', marginBottom:20 },
     tab:    a => ({ padding:'9px 18px', fontSize:13, cursor:'pointer', borderBottom:a?'2px solid #002060':'2px solid transparent', color:a?'#002060':'#666', fontWeight:a?600:400, background:'none', border:'none', borderBottom:a?'2px solid #002060':'2px solid transparent' }),
-    sem:    v => { const c = v===null?'#ccc':v<-2000?'#C00000':v<-500?'#EF9F27':'#639922'; return {width:10,height:10,borderRadius:'50%',background:c,display:'inline-block',marginRight:6} },
+    sem:    v => { const c = v===null?'#ccc':(v+2000)<0?'#C00000':(v+500)<0?'#EF9F27':'#639922'; return {width:10,height:10,borderRadius:'50%',background:c,display:'inline-block',marginRight:6} },
   }
 
   function colorNeto(neto, umbral1, umbral2) {
