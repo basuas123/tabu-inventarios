@@ -439,7 +439,7 @@ export default function DireccionPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {(analisisSuc.detalle||[]).filter(r=>r.resultado!=='OK').map((r,i)=>(
+                        {(analisisSuc.detalle||[]).filter(r=>r.resultado!=='OK').sort((a,b)=>(a.grupo||'').localeCompare(b.grupo||'')||(a.nombre||'').localeCompare(b.nombre||'')).map((r,i)=>(
                           <tr key={r.nombre} style={{background:i%2?'#f9f9f9':'#fff'}}>
                             <td style={{padding:'6px 8px',fontWeight:500}}>{r.nombre}</td>
                             <td style={{padding:'6px 8px',color:'#888',fontSize:11}}>{r.grupo}</td>
