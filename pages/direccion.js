@@ -72,6 +72,47 @@ function calcularImpacto(sucKey, datos, analisisData, totalProds) {
   return { faltante: null, sobrante: null, neto: null, conDif: 0, capturados, total, tieneAnalisis: false }
 }
 
+function DetalleHistorial({ semanaVer, sucRevision, resumenHist, sucursales, fmt, colorNeto, estadoNeto }) {
+  if (!semanaVer) return null
+  const nombreSuc = sucursales.find(s=>s.k===sucRevision)?.n
+  const r = resumenHist[sucRevision]
+  const neto = r?.neto ?? null
+  const estCol = colorNeto(neto, 2000, 500)
+  const estBg2 = !r||neto===null ? '#f5f5f5' : colorNeto(neto,2000,500)==='#C00000' ? '#FCEBEB' : colorNeto(neto,2000,500)==='#EF9F27' ? '#FAEEDA' : '#EAF3DE'
+  const estado = !r ? 'Sin datos' : neto===null ? 'Sin Soft' : estadoNeto(neto)
+  return (
+    <div style={{background:'#f9f9f9',borderRadius:10,padding:'16px 20px'}}>
+      <div style={{fontWeight:600,fontSize:14,marginBottom:14}}>
+        {nombreSuc} — Semana {semanaVer}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:12}}>
+        <div style={{background:'#FCEBEB',borderRadius:8,padding:'10px 14px'}}>
+          <div style={{fontSize:11,color:'#888',marginBottom:3}}>Pérdida ($)</div>
+          <div style={{fontSize:18,fontWeight:700,color:'#C00000'}}>{r?.faltante!=null?fmt(r.faltante):'—'}</div>
+        </div>
+        <div style={{background:'#EAF3DE',borderRadius:8,padding:'10px 14px'}}>
+          <div style={{fontSize:11,color:'#888',marginBottom:3}}>Sobrante ($)</div>
+          <div style={{fontSize:18,fontWeight:700,color:'#3B6D11'}}>{r?.sobrante!=null?fmt(r.sobrante):'—'}</div>
+        </div>
+        <div style={{background:'#FFF2CC',borderRadius:8,padding:'10px 14px'}}>
+          <div style={{fontSize:11,color:'#888',marginBottom:3}}>Impacto neto</div>
+          <div style={{fontSize:18,fontWeight:700,color:estCol}}>{neto!=null?fmt(neto):'—'}</div>
+        </div>
+        <div style={{background:'#f5f5f5',borderRadius:8,padding:'10px 14px'}}>
+          <div style={{fontSize:11,color:'#888',marginBottom:3}}>Capturados</div>
+          <div style={{fontSize:18,fontWeight:700}}>{r ? r.capturados+'/'+r.total : '—'}</div>
+        </div>
+        <div style={{background:estBg2,borderRadius:8,padding:'10px 14px'}}>
+          <div style={{fontSize:11,color:'#888',marginBottom:3}}>Estado</div>
+          <div style={{fontSize:16,fontWeight:700,color:estCol}}>{estado}</div>
+        </div>
+      </div>
+      {r?.responsable && <div style={{fontSize:12,color:'#888'}}>Responsable: {r.responsable}</div>}
+      {!r && <div style={{textAlign:'center',color:'#888',fontSize:13,padding:20}}>Sin datos para esta sucursal en la semana {semanaVer}</div>}
+    </div>
+  )
+}
+
 function DetalleAcumulado({ sucKey, acumData, sucursales, fmt, colorNeto, card }) {
   if (!sucKey || !acumData) return null
   const nombreSuc = sucursales.find(s=>s.k===sucKey)?.n
@@ -352,6 +393,13 @@ export default function DireccionPage() {
     tabs:   { display:'flex', borderBottom:'1px solid #eee', marginBottom:20 },
     tab:    a => ({ padding:'9px 18px', fontSize:13, cursor:'pointer', borderBottom:a?'2px solid #002060':'2px solid transparent', color:a?'#002060':'#666', fontWeight:a?600:400, background:'none', border:'none', borderBottom:a?'2px solid #002060':'2px solid transparent' }),
     sem:    v => { const c = v===null?'#ccc':(v+2000)<0?'#C00000':(v+500)<0?'#EF9F27':'#639922'; return {width:10,height:10,borderRadius:'50%',background:c,display:'inline-block',marginRight:6} },
+  }
+
+  function getSoftDif(analisisSuc, producto, impactoFallback) {
+    const det = analisisSuc?.detalle || []
+    const soft = det.find(d => d.nombre === producto || (d.nombre && d.nombre.toUpperCase() === (producto||'').toUpperCase()))
+    if (soft && soft.dif != null) return soft.dif.toFixed(3)
+    return impactoFallback ? impactoFallback.toFixed(3) : '—'
   }
 
   function colorNeto(neto, umbral1, umbral2) {
@@ -770,10 +818,7 @@ export default function DireccionPage() {
                               {(analisisSuc?.detalle||[]).find(d=>d.nombre===r.producto||d.nombre?.toUpperCase()===r.producto?.toUpperCase())?.unidad||'—'}
                             </td>
                             <td style={{padding:'7px 10px',color:'#C00000',fontWeight:600}}>
-                              {(()=>{
-                                const soft = (analisisSuc?.detalle||[]).find(d=>d.nombre===r.producto||d.nombre?.toUpperCase()===r.producto?.toUpperCase())
-                                return soft?.dif != null ? soft.dif.toFixed(3) : r.impacto ? r.impacto.toFixed(3) : '—'
-                              })()}
+                              {getSoftDif(analisisSuc, r.producto, r.impacto)}
                             </td>
                             <td style={{padding:'7px 10px',fontWeight:700,color:'#C00000'}}>{fmt(Math.abs(r.impacto||0))}</td>
                             <td style={{padding:'7px 10px',color:'#888',fontSize:12}}>{r.notas||'—'}</td>
@@ -865,59 +910,15 @@ export default function DireccionPage() {
                   </div>
 
                   {/* Detalle de la sucursal seleccionada para la semana elegida */}
-                  {semanaVer && (() => {
-                    const nombreSuc = SUCURSALES.find(s=>s.k===sucRevision)?.n
-                    const r = resumenHist[sucRevision]
-                    const neto = r?.neto ?? null
-                    const estCol = colorNeto(neto, 2000, 500)
-                    const estBg2 = !r||neto===null?'#f5f5f5':colorNeto(neto,2000,500)==='#C00000'?'#FCEBEB':colorNeto(neto,2000,500)==='#EF9F27'?'#FAEEDA':'#EAF3DE'
-                    const estado = !r?'Sin datos':neto===null?'Sin Soft':estadoNeto(neto)
-                    return (
-                      <div style={{background:'#f9f9f9',borderRadius:10,padding:'16px 20px'}}>
-                        <div style={{fontWeight:600,fontSize:14,marginBottom:14}}>
-                          {nombreSuc} — Semana {semanaVer}
-                        </div>
-                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:10,marginBottom:12}}>
-                          <div style={{background:'#FCEBEB',borderRadius:8,padding:'10px 14px'}}>
-                            <div style={{fontSize:11,color:'#888',marginBottom:3}}>Pérdida ($)</div>
-                            <div style={{fontSize:18,fontWeight:700,color:'#C00000'}}>
-                              {r?.faltante!=null?fmt(r.faltante):'—'}
-                            </div>
-                          </div>
-                          <div style={{background:'#EAF3DE',borderRadius:8,padding:'10px 14px'}}>
-                            <div style={{fontSize:11,color:'#888',marginBottom:3}}>Sobrante ($)</div>
-                            <div style={{fontSize:18,fontWeight:700,color:'#3B6D11'}}>
-                              {r?.sobrante!=null?fmt(r.sobrante):'—'}
-                            </div>
-                          </div>
-                          <div style={{background:'#FFF2CC',borderRadius:8,padding:'10px 14px'}}>
-                            <div style={{fontSize:11,color:'#888',marginBottom:3}}>Impacto neto</div>
-                            <div style={{fontSize:18,fontWeight:700,color:estCol}}>
-                              {neto!=null?fmt(neto):'—'}
-                            </div>
-                          </div>
-                          <div style={{background:'#f5f5f5',borderRadius:8,padding:'10px 14px'}}>
-                            <div style={{fontSize:11,color:'#888',marginBottom:3}}>Capturados</div>
-                            <div style={{fontSize:18,fontWeight:700}}>
-                              {r?`${r.capturados||0}/${r.total||0}`:'—'}
-                            </div>
-                          </div>
-                          <div style={{background:estBg2,borderRadius:8,padding:'10px 14px'}}>
-                            <div style={{fontSize:11,color:'#888',marginBottom:3}}>Estado</div>
-                            <div style={{fontSize:16,fontWeight:700,color:estCol}}>{estado}</div>
-                          </div>
-                        </div>
-                        {r?.responsable && (
-                          <div style={{fontSize:12,color:'#888'}}>Responsable: {r.responsable}</div>
-                        )}
-                        {!r && (
-                          <div style={{textAlign:'center',color:'#888',fontSize:13,padding:20}}>
-                            Sin datos para esta sucursal en la semana {semanaVer}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })()}
+                  <DetalleHistorial
+                    semanaVer={semanaVer}
+                    sucRevision={sucRevision}
+                    resumenHist={resumenHist}
+                    sucursales={SUCURSALES}
+                    fmt={fmt}
+                    colorNeto={colorNeto}
+                    estadoNeto={estadoNeto}
+                  />
                 </>
               )}
             </div>
