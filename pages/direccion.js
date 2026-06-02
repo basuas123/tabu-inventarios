@@ -675,7 +675,10 @@ export default function DireccionPage() {
                               {(analisisSuc?.detalle||[]).find(d=>d.nombre===r.producto||d.nombre?.toUpperCase()===r.producto?.toUpperCase())?.unidad||'—'}
                             </td>
                             <td style={{padding:'7px 10px',color:'#C00000',fontWeight:600}}>
-                              {r.impacto ? r.impacto.toFixed(3) : '—'}
+                              {(()=>{
+                                const soft = (analisisSuc?.detalle||[]).find(d=>d.nombre===r.producto||d.nombre?.toUpperCase()===r.producto?.toUpperCase())
+                                return soft?.dif != null ? soft.dif.toFixed(3) : r.impacto ? r.impacto.toFixed(3) : '—'
+                              })()}
                             </td>
                             <td style={{padding:'7px 10px',fontWeight:700,color:'#C00000'}}>{fmt(Math.abs(r.impacto||0))}</td>
                             <td style={{padding:'7px 10px',color:'#888',fontSize:12}}>{r.notas||'—'}</td>
