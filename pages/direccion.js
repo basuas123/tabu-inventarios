@@ -522,8 +522,13 @@ export default function DireccionPage() {
                 <div style={{fontWeight:600,fontSize:14}}>Historial de revisiones</div>
                 <button style={st.btnPr} onClick={agregarRevision}>+ Agregar manual</button>
               </div>
-              {revisiones.length === 0 ? (
-                <div style={{textAlign:'center',padding:30,color:'#888',fontSize:13}}>Sin discrepancias registradas</div>
+              {(() => {
+                const nombreSuc = sucRevision ? SUCURSALES.find(s=>s.k===sucRevision)?.n : null
+                const revFiltradas = nombreSuc ? revisiones.filter(r => r.sucursal === nombreSuc) : revisiones
+                return revFiltradas.length === 0 ? (
+                <div style={{textAlign:'center',padding:30,color:'#888',fontSize:13}}>
+                  {nombreSuc ? `Sin revisiones registradas para ${nombreSuc}` : 'Sin discrepancias registradas'}
+                </div>
               ) : (
                 <div style={{overflowX:'auto'}}>
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
@@ -535,7 +540,7 @@ export default function DireccionPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {revisiones.map((r,i) => (
+                      {revFiltradas.map((r,i) => (
                         <tr key={r.id||i} style={{background:i%2?'#f9f9f9':'#fff'}}>
                           <td style={{padding:'7px 10px',fontWeight:600}}>{r.sucursal}</td>
                           <td style={{padding:'7px 10px'}}>{r.producto}</td>
@@ -560,7 +565,7 @@ export default function DireccionPage() {
                     </tbody>
                   </table>
                 </div>
-              )}
+              )})()}
             </div>
 
             {/* Cobros */}
