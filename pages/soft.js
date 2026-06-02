@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import * as XLSX from 'xlsx'
+import productosDB from '../lib/productos.json'
 import { exportarAnalisisSoft, imprimir } from '../lib/exportar'
 
 const SUCURSALES = [
@@ -172,6 +173,11 @@ export default function SoftPage() {
     if (!softData || !sucursal) return
     setLoading(true)
 
+    // Mapa de nombre → grupo usando productos.json
+    const grupoMap = {}
+    const prods = productosDB[sucursal]?.productos || []
+    prods.forEach(p => { grupoMap[p.nombre] = p.grupo })
+
     const resultados = []
     let totalFalt = 0, totalSobr = 0
 
@@ -187,7 +193,7 @@ export default function SoftPage() {
 
       resultados.push({
         nombre,
-        grupo:     prod.grupo   || '',
+        grupo:     grupoMap[nombre] || prod.grupo || '',
         unidad:    prod.unidad  || '',
         fisico:    prod.fisico  || 0,
         sistema:   prod.existencia || 0,
@@ -198,7 +204,7 @@ export default function SoftPage() {
       })
     })
 
-    resultados.sort((a,b) => a.imp - b.imp)
+    resultados.sort((a,b) => (a.grupo||'').localeCompare(b.grupo||'') || (a.nombre||'').localeCompare(b.nombre||''))
     const neto = totalFalt + totalSobr
     setAnalisis({ resultados, totalFalt, totalSobr, sinCruce: 0, neto })
     setTab('analisis')
