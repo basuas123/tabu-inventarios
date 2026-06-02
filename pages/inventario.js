@@ -291,6 +291,15 @@ export default function InventarioPage() {
                           value={cantidades[p.id] ?? ''}
                           onChange={e=>updateCantidad(p.id, e.target.value)}
                           placeholder="0"
+                          data-prod-id={p.id}
+                          onKeyDown={e=>{
+                            if(e.key==='Enter'){
+                              e.preventDefault()
+                              const inputs = Array.from(document.querySelectorAll('input[data-prod-id]'))
+                              const idx = inputs.findIndex(el=>el.dataset.prodId===p.id)
+                              if(idx>=0 && idx<inputs.length-1) inputs[idx+1].focus()
+                            }
+                          }}
                         />
                       </div>
                     ))}
