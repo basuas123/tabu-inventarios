@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import * as XLSX from 'xlsx'
-import productosDB from '../lib/productos.json'
+
 import { exportarAnalisisSoft, imprimir } from '../lib/exportar'
 
 const SUCURSALES = [
@@ -77,6 +77,7 @@ export default function SoftPage() {
 
         // Columnas del reporte de Soft Restaurant
         const colDesc    = headers.findIndex(h => h === 'descripcion' || (h.includes('descripcion') && !h.includes('grupo')))
+        const colGrupo   = headers.findIndex(h => h === 'descripciongrupo' || h === 'grupo')
         const colFisico  = headers.findIndex(h => h === 'fisicoalmacen1' || h.includes('fisico') && h.includes('1'))
         const colExist   = headers.findIndex(h => h === 'existenciaalmacen1' || (h.includes('existencia') && h.includes('1')))
         const colDifImp  = headers.findIndex(h => h === 'diferenciaimportealmacen1' || (h.includes('diferencia') && h.includes('importe')))
@@ -106,6 +107,7 @@ export default function SoftPage() {
           const exist   = colExist  >= 0  ? (parseFloat(row[colExist])   || 0) : 0
           const costo   = colCosto  >= 0  ? (parseFloat(row[colCosto])   || 0) : 0
           const unid    = colUnid   >= 0  ? String(row[colUnid] || '')        : ''
+          const grupo   = colGrupo  >= 0  ? String(row[colGrupo] || '').trim().toUpperCase() : ''
           const difUnd  = colDifUnd >= 0  ? (parseFloat(row[colDifUnd])  || 0) : (fisico - exist)
           const difImp  = colDifImp >= 0  ? (parseFloat(row[colDifImp])  || 0) : (difUnd * costo)
 
@@ -115,7 +117,7 @@ export default function SoftPage() {
           const difReal     = existValida ? difUnd  : 0
           const impReal     = existValida ? difImp  : 0
 
-          productos[desc] = { existencia: exist, fisico, costo, unidad: unid, difUnd: difReal, difImp: impReal, existValida }
+          productos[desc] = { existencia: exist, fisico, costo, unidad: unid, grupo, difUnd: difReal, difImp: impReal, existValida }
 
           if (existValida && Math.abs(difReal) > 0.001) {
             if (impReal < 0) totalFaltante += impReal
@@ -173,10 +175,8 @@ export default function SoftPage() {
     if (!softData || !sucursal) return
     setLoading(true)
 
-    // Mapa de nombre → grupo usando productos.json
+    // Mapa de nombre → grupo — se construye desde el análisis mismo
     const grupoMap = {}
-    const prods = productosDB[sucursal]?.productos || []
-    prods.forEach(p => { grupoMap[p.nombre] = p.grupo })
 
     const resultados = []
     let totalFalt = 0, totalSobr = 0
