@@ -330,7 +330,24 @@ export default function DireccionPage() {
       if (data && data.length > 0) {
         // Tomar el más reciente que tenga detalle
         const conDetalle = data.find(d => d.resultados?.detalle || d.resultados?.totalFalt)
-        setAnalisisSuc(conDetalle ? conDetalle.resultados : null)
+        let resultados = conDetalle ? conDetalle.resultados : null
+        // Enriquecer grupo desde el catálogo si el análisis guardado no lo trae
+        if (resultados?.detalle?.some(d => !d.grupo)) {
+          try {
+            const catRes = await fetch('/api/productos?sucursal=' + sucKey)
+            const { productos } = await catRes.json()
+            const m = {}
+            ;(productos || []).forEach(p => { m[(p.nombre || '').toUpperCase()] = p.grupo || '' })
+            resultados = {
+              ...resultados,
+              detalle: resultados.detalle.map(d => ({
+                ...d,
+                grupo: d.grupo || m[(d.nombre || '').toUpperCase()] || ''
+              }))
+            }
+          } catch (e2) {}
+        }
+        setAnalisisSuc(resultados)
         if (conDetalle) setSemanaAnalisis(conDetalle.semana)
       } else {
         setAnalisisSuc(null)

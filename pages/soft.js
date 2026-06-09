@@ -43,6 +43,7 @@ export default function SoftPage() {
   const [loading, setLoading]   = useState(false)
   const [tab, setTab]           = useState('cargar')
   const fileRef = useRef()
+  const [grupoCatalogo, setGrupoCatalogo] = useState({})  // nombre → grupo, desde el catálogo
   const semana = getWeek()
 
   useEffect(() => {
@@ -108,7 +109,7 @@ export default function SoftPage() {
           const exist   = colExist  >= 0  ? (parseFloat(row[colExist])   || 0) : 0
           const costo   = colCosto  >= 0  ? (parseFloat(row[colCosto])   || 0) : 0
           const unid    = colUnid   >= 0  ? String(row[colUnid] || '')        : ''
-          const grupo   = colGrupo  >= 0  ? String(row[colGrupo] || '').trim().toUpperCase() : ''
+          const grupo   = (colGrupo >= 0 ? String(row[colGrupo] || '').trim().toUpperCase() : '') || grupoCatalogo[desc] || ''
           const difUnd  = colDifUnd >= 0  ? (parseFloat(row[colDifUnd])  || 0) : (fisico - exist)
           const difImp  = colDifImp >= 0  ? (parseFloat(row[colDifImp])  || 0) : (difUnd * costo)
 
@@ -126,7 +127,7 @@ export default function SoftPage() {
               else if (impReal > 0) totalSobrante += impReal
             }
             // Guardar TODOS los productos (con y sin diferencia) para exportar a Soft
-            detalleProductos.push({ desc, difUnd: difReal, difImp: impReal, costo, grupo: '', fisico, exist })
+            detalleProductos.push({ desc, difUnd: difReal, difImp: impReal, costo, grupo, fisico, exist })
           }
         }
 
@@ -137,14 +138,14 @@ export default function SoftPage() {
             totalSobr: totalSobrante,
             neto: totalFaltante + totalSobrante,
             items: detalleProductos.length,
-            detalle: detalleProductos.map(p => ({
+            detalle: ordenarComoSoft(detalleProductos.map(p => ({
               nombre: p.desc, grupo: p.grupo, 
               fisico: p.fisico ?? (p.difUnd + (productos[p.desc]?.existencia||0)),
               sistema: p.exist ?? (productos[p.desc]?.existencia || 0),
               unidad: productos[p.desc]?.unidad || '',
               dif: p.difUnd, imp: p.difImp, costo: p.costo,
               resultado: Math.abs(p.difImp) < 0.001 ? 'OK' : p.difImp < 0 ? 'FALTANTE' : 'SOBRANTE'
-            }))
+            })))
           }
           // Guardar análisis en Supabase inmediatamente
           fetch('/api/analisis', {
@@ -292,7 +293,21 @@ export default function SoftPage() {
               <select
                 style={{width:'100%',maxWidth:340,padding:'9px 12px',border:'1px solid #ddd',borderRadius:8,fontSize:14}}
                 value={sucursal}
-                onChange={e=>setSucursal(e.target.value)}
+                onChange={e=>{
+                  const k = e.target.value
+                  setSucursal(k)
+                  setGrupoCatalogo({})
+                  if (k) {
+                    fetch('/api/productos?sucursal=' + k)
+                      .then(r=>r.json())
+                      .then(({productos})=>{
+                        const m = {}
+                        ;(productos||[]).forEach(p=>{ m[(p.nombre||'').toUpperCase()] = p.grupo || '' })
+                        setGrupoCatalogo(m)
+                      })
+                      .catch(()=>{})
+                  }
+                }}
               >
                 <option value="">Selecciona la sucursal...</option>
                 {SUCURSALES.map(s=><option key={s.k} value={s.k}>{s.n}</option>)}
