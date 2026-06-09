@@ -176,9 +176,9 @@ export default function DireccionPage() {
   const semanasDesdeIni = semanasDisponibles.filter(s => s >= acumSemIni)
   const totalSemanasRango = acumSemFin - acumSemIni + 1
   const semanaActual = semana
-  // Semana de referencia para Revisión y cobro: la del análisis cargado, no la actual
-  const semanaRef = semanaAnalisis || semana
   const [semanaFiltro, setSemanaFiltro] = useState(getWeek())
+  // Semana global seleccionada: manda en Revisión y cobro, A cobrar, Historial y Acumulado
+  const semanaRef = semanaFiltro || semana
   const [resumenFiltro, setResumenFiltro] = useState({})
 
   useEffect(() => {
@@ -320,12 +320,13 @@ export default function DireccionPage() {
     } catch(e) {}
   }
 
-  async function cargarAnalisisSucursal(sucKey) {
+  async function cargarAnalisisSucursal(sucKey, sem) {
     setSucRevision(sucKey)
     if (!sucKey) { setAnalisisSuc(null); return }
+    const semSel = sem || semanaFiltro
     try {
-      // Cargar el análisis más reciente de esta sucursal (sin filtrar por semana)
-      const res = await fetch('/api/analisis?sucursal=' + sucKey + '&año=' + new Date().getFullYear())
+      // Cargar el análisis de esta sucursal para la semana seleccionada
+      const res = await fetch('/api/analisis?sucursal=' + sucKey + '&semana=' + semSel + '&año=' + new Date().getFullYear())
       const { data } = await res.json()
       if (data && data.length > 0) {
         // Tomar el más reciente que tenga detalle
@@ -351,8 +352,9 @@ export default function DireccionPage() {
         if (conDetalle) setSemanaAnalisis(conDetalle.semana)
       } else {
         setAnalisisSuc(null)
+        setSemanaAnalisis(null)
       }
-    } catch(e) { setAnalisisSuc(null) }
+    } catch(e) { setAnalisisSuc(null); setSemanaAnalisis(null) }
   }
 
   async function cambiarEstatus(id, nuevoEstatus) {
@@ -404,7 +406,11 @@ export default function DireccionPage() {
   const estColor  = { PENDIENTE:'#EF9F27',  'EN REVISIÓN':'#EF9F27', CORREGIDO:'#639922', CONFIRMADO:'#C00000', 'A COBRO':'#C00000' }
   const estBg     = { PENDIENTE:'#FAEEDA', 'EN REVISIÓN':'#FAEEDA', CORREGIDO:'#EAF3DE', CONFIRMADO:'#FCEBEB', 'A COBRO':'#FCEBEB' }
 
-  const totalCobro = cobros.reduce((a,r) => a + Math.abs(r.impacto || 0), 0)
+  // Filtrar por semana global; registros sin semana se muestran siempre
+  const enSemana = r => r.semana == null || String(r.semana) === String(semanaRef)
+  const revisionesSemana = revisiones.filter(enSemana)
+  const cobrosSemana = cobros.filter(enSemana)
+  const totalCobro = cobrosSemana.reduce((a,r) => a + Math.abs(r.impacto || 0), 0)
 
   const st = {
     topbar: { background:'#fff', borderBottom:'1px solid #eee', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:52, position:'sticky', top:0, zIndex:100 },
@@ -454,7 +460,7 @@ export default function DireccionPage() {
           <button style={st.btn} onClick={()=>{
             if (tab === 'revision') {
               const sucNombre = SUCURSALES.find(s=>s.k===sucRevision)?.n || sucRevision
-              const revFiltradas = sucRevision ? revisiones.filter(r => r.sucursal === sucNombre) : revisiones
+              const revFiltradas = sucRevision ? revisionesSemana.filter(r => r.sucursal === sucNombre) : revisionesSemana
               exportarRevisionCobro({ sucursal: sucNombre, analisisSuc, revisiones: revFiltradas, semana: semanaRef, año: new Date().getFullYear() })
             } else {
               exportarResumenDireccion({sucursales:SUCURSALES,resumen,semana,año:new Date().getFullYear()})
@@ -482,47 +488,57 @@ export default function DireccionPage() {
           <button style={st.tab(tab==='sucursales')} onClick={()=>setTab('sucursales')}>Sucursales</button>
           <button style={st.tab(tab==='revision')}   onClick={()=>setTab('revision')}>Revisión y cobro</button>
           <button style={st.tab(tab==='cobros')}    onClick={()=>setTab('cobros')}>
-            {cobros.length ? '💰 A cobrar ('+cobros.length+')' : 'A cobrar'}
+            {cobrosSemana.length ? '💰 A cobrar ('+cobrosSemana.length+')' : 'A cobrar'}
           </button>
           <button style={st.tab(tab==='historial')}  onClick={()=>{setTab('historial');cargarHistorial()}}>Historial</button>
           <button style={st.tab(tab==='acumulado')}  onClick={()=>setTab('acumulado')}>Acumulado</button>
         </div>
 
+        {/* Selector de semana GLOBAL — aplica a todas las pestañas */}
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14,background:'#fff',border:'1px solid #eee',borderRadius:10,padding:'10px 14px'}}>
+          <span style={{fontSize:13,fontWeight:600,color:'#555'}}>Ver semana:</span>
+          <select
+            style={{padding:'6px 12px',border:'1px solid #ddd',borderRadius:8,fontSize:13}}
+            value={semanaFiltro}
+            onChange={async e=>{
+              const s = parseInt(e.target.value)
+              setSemanaFiltro(s)
+              // Sincronizar las demás pestañas con la semana elegida
+              if (sucRevision) cargarAnalisisSucursal(sucRevision, s)
+              if (tab === 'historial') verSemana(s)
+              setAcumSemFin(s)
+              if (s === semana) {
+                setResumenFiltro({})
+                return
+              }
+              const año = new Date().getFullYear()
+              const [resR, analR] = await Promise.all([
+                fetch('/api/resumen?semana='+s+'&año='+año).then(r=>r.json()).catch(()=>({data:[]})),
+                fetch('/api/analisis?semana='+s+'&año='+año).then(r=>r.json()).catch(()=>({data:[]})),
+              ])
+              const analMap = {}
+              if (analR.data) analR.data.forEach(row=>{ analMap[row.sucursal]=row.resultados })
+              const map = {}
+              if (resR.data) resR.data.forEach(row=>{
+                map[row.sucursal] = calcularImpacto(row.sucursal, row.datos, analMap[row.sucursal]) || {}
+              })
+              SUCURSALES.forEach(suc=>{ if(!map[suc.k]) map[suc.k]=null })
+              setResumenFiltro(map)
+            }}
+          >
+            {Array.from({length:semana},(_,i)=>semana-i).map(s=>(
+              <option key={s} value={s}>Semana {s}{s===semanaActual?' (actual)':''}</option>
+            ))}
+          </select>
+          {semanaFiltro !== semana && (
+            <span style={{fontSize:12,color:'#854F0B',background:'#FAEEDA',padding:'3px 10px',borderRadius:100,fontWeight:600}}>
+              Viendo y editando semana {semanaFiltro}
+            </span>
+          )}
+        </div>
+
         {tab === 'sucursales' && (
           <div style={st.card}>
-            {/* Selector de semana */}
-            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
-              <span style={{fontSize:13,fontWeight:600,color:'#555'}}>Ver semana:</span>
-              <select
-                style={{padding:'6px 12px',border:'1px solid #ddd',borderRadius:8,fontSize:13}}
-                value={semanaFiltro}
-                onChange={async e=>{
-                  const s = parseInt(e.target.value)
-                  setSemanaFiltro(s)
-                  if (s === semana) {
-                    setResumenFiltro({})
-                    return
-                  }
-                  const año = new Date().getFullYear()
-                  const [resR, analR] = await Promise.all([
-                    fetch('/api/resumen?semana='+s+'&año='+año).then(r=>r.json()).catch(()=>({data:[]})),
-                    fetch('/api/analisis?semana='+s+'&año='+año).then(r=>r.json()).catch(()=>({data:[]})),
-                  ])
-                  const analMap = {}
-                  if (analR.data) analR.data.forEach(row=>{ analMap[row.sucursal]=row.resultados })
-                  const map = {}
-                  if (resR.data) resR.data.forEach(row=>{
-                    map[row.sucursal] = calcularImpacto(row.sucursal, row.datos, analMap[row.sucursal]) || {}
-                  })
-                  SUCURSALES.forEach(suc=>{ if(!map[suc.k]) map[suc.k]=null })
-                  setResumenFiltro(map)
-                }}
-              >
-                {Array.from({length:semana},(_,i)=>semana-i).map(s=>(
-                  <option key={s} value={s}>Semana {s}{s===semanaActual?' (actual)':''}</option>
-                ))}
-              </select>
-            </div>
             <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                 <thead>
@@ -584,13 +600,13 @@ export default function DireccionPage() {
                   <option value="">Selecciona una sucursal...</option>
                   {SUCURSALES.map(s=><option key={s.k} value={s.k}>{s.n}</option>)}
                 </select>
-                {sucRevision && semanaAnalisis && <span style={{fontSize:12,color:'#888'}}>Semana {semanaAnalisis}</span>}
+                {sucRevision && <span style={{fontSize:12,color:'#888'}}>Semana {semanaRef}</span>}
               </div>
 
               {sucRevision && !analisisSuc && (
                 <div style={{padding:'20px',textAlign:'center',color:'#888',fontSize:13,background:'#f9f9f9',borderRadius:8}}>
-                  Esta sucursal no tiene ningún análisis de Soft cargado.<br/>
-                  <span style={{fontSize:12}}>Usa el botón "Cargar Soft" para generar el análisis.</span>
+                  Esta sucursal no tiene análisis de Soft para la semana {semanaRef}.<br/>
+                  <span style={{fontSize:12}}>Elige otra semana arriba, o usa "Cargar Soft" para generar el análisis.</span>
                 </div>
               )}
 
@@ -648,9 +664,10 @@ export default function DireccionPage() {
                             </td>
                             <td style={{padding:'6px 8px'}}>
                               <input
+                                key={semanaRef+'-'+sucRevision+'-'+r.nombre}
                                 type="number" min="0" step="0.001"
                                 style={{width:80,padding:'4px 6px',border:'1px solid #ddd',borderRadius:6,fontSize:11,textAlign:'center'}}
-                                defaultValue={revisiones.find(rv=>rv.sucursal===(SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision)&&rv.producto===r.nombre)?.cantidad_ajustada??''}
+                                defaultValue={revisionesSemana.find(rv=>rv.sucursal===(SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision)&&rv.producto===r.nombre)?.cantidad_ajustada??''}
                                 placeholder={parseFloat(r.fisico??0).toFixed(3)}
                                 data-ajuste-id={r.nombre}
                                 onKeyDown={e=>{
@@ -665,7 +682,7 @@ export default function DireccionPage() {
                                 onBlur={async e=>{
                                   const suc = SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision
                                   const val = e.target.value===''?null:parseFloat(e.target.value)
-                                  const existing = revisiones.find(rev=>rev.sucursal===suc&&rev.producto===r.nombre)
+                                  const existing = revisionesSemana.find(rev=>rev.sucursal===suc&&rev.producto===r.nombre)
                                   if (existing) {
                                     await fetch('/api/revisiones',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:existing.id,cantidad_ajustada:val})})
                                   } else {
@@ -677,13 +694,14 @@ export default function DireccionPage() {
                             </td>
                             <td style={{padding:'6px 8px'}}>
                               <select
+                                key={semanaRef+'-'+sucRevision+'-'+r.nombre+'-est'}
                                 style={{padding:'4px 8px',borderRadius:6,border:'1px solid #ddd',fontSize:11,cursor:'pointer'}}
-                                defaultValue="PENDIENTE"
+                                defaultValue={revisionesSemana.find(rv=>rv.sucursal===(SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision)&&rv.producto===r.nombre)?.estatus||'PENDIENTE'}
                                 onChange={async e=>{
                                   const suc = SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision
                                   const nuevoEstatus = e.target.value
                                   // Buscar si ya existe esta revisión
-                                  const existing = revisiones.find(
+                                  const existing = revisionesSemana.find(
                                     rev => rev.sucursal===suc && rev.producto===r.nombre
                                   )
                                   if (existing) {
@@ -738,7 +756,7 @@ export default function DireccionPage() {
               </div>
               {(() => {
                 const nombreSuc = sucRevision ? SUCURSALES.find(s=>s.k===sucRevision)?.n : null
-                const revFiltradas = nombreSuc ? revisiones.filter(r => r.sucursal === nombreSuc) : revisiones
+                const revFiltradas = nombreSuc ? revisionesSemana.filter(r => r.sucursal === nombreSuc) : revisionesSemana
                 return revFiltradas.length === 0 ? (
                 <div style={{textAlign:'center',padding:30,color:'#888',fontSize:13}}>
                   {nombreSuc ? `Sin revisiones registradas para ${nombreSuc}` : 'Sin discrepancias registradas'}
@@ -809,7 +827,7 @@ export default function DireccionPage() {
                 </div>
               ) : (() => {
                 const nombreSuc = SUCURSALES.find(s=>s.k===sucRevision)?.n || sucRevision
-                const itemsSuc = cobros.filter(r => r.sucursal === nombreSuc)
+                const itemsSuc = cobrosSemana.filter(r => r.sucursal === nombreSuc)
                 const totalSuc = itemsSuc.reduce((a,r) => a + Math.abs(r.impacto||0), 0)
 
                 return itemsSuc.length === 0 ? (
