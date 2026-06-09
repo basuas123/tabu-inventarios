@@ -160,6 +160,7 @@ export default function DireccionPage() {
   const [cobros, setCobros]           = useState([])
   const [sucRevision, setSucRevision] = useState('')
   const [analisisSuc, setAnalisisSuc]   = useState(null)
+  const [semanaAnalisis, setSemanaAnalisis] = useState(null)
   const [historial, setHistorial]       = useState([])
   const [semanaVer, setSemanaVer]       = useState(null)
   const [resumenHist, setResumenHist]   = useState({})
@@ -320,10 +321,14 @@ export default function DireccionPage() {
     setSucRevision(sucKey)
     if (!sucKey) { setAnalisisSuc(null); return }
     try {
-      const res = await fetch('/api/analisis?sucursal=' + sucKey + '&semana=' + semana + '&año=' + new Date().getFullYear())
+      // Cargar el análisis más reciente de esta sucursal (sin filtrar por semana)
+      const res = await fetch('/api/analisis?sucursal=' + sucKey + '&año=' + new Date().getFullYear())
       const { data } = await res.json()
-      if (data && data.length > 0 && data[0].resultados?.detalle) {
-        setAnalisisSuc(data[0].resultados)
+      if (data && data.length > 0) {
+        // Tomar el más reciente que tenga detalle
+        const conDetalle = data.find(d => d.resultados?.detalle || d.resultados?.totalFalt)
+        setAnalisisSuc(conDetalle ? conDetalle.resultados : null)
+        if (conDetalle) setSemanaAnalisis(conDetalle.semana)
       } else {
         setAnalisisSuc(null)
       }
@@ -559,7 +564,7 @@ export default function DireccionPage() {
                   <option value="">Selecciona una sucursal...</option>
                   {SUCURSALES.map(s=><option key={s.k} value={s.k}>{s.n}</option>)}
                 </select>
-                {sucRevision && <span style={{fontSize:12,color:'#888'}}>Semana {semana}</span>}
+                {sucRevision && semanaAnalisis && <span style={{fontSize:12,color:'#888'}}>Semana {semanaAnalisis}</span>}
               </div>
 
               {sucRevision && !analisisSuc && (
