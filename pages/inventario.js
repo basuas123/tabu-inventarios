@@ -46,7 +46,7 @@ export default function InventarioPage() {
           // Filtrar solo las de esta sucursal (por nombre exacto)
           const misSucursal = data.filter(r =>
             r.sucursal === u.nombre &&
-            (r.estatus === 'EN REVISIÓN' || r.estatus === 'CONFIRMADO' || r.estatus === 'A COBRO')
+            (r.estatus === 'EN REVISIÓN' || r.estatus === 'CONFIRMADO' || r.estatus === 'A COBRO' || r.estatus === 'REVISADA')
           )
           setRevisiones(misSucursal)
         }
@@ -337,37 +337,74 @@ export default function InventarioPage() {
                 )}
                 {revisiones.some(r=>r.estatus==='EN REVISIÓN'||r.estatus==='CONFIRMADO') && (
                   <div style={{background:'#FAEEDA',borderRadius:8,padding:'12px 14px',marginBottom:14,fontSize:13,color:'#854F0B'}}>
-                    ⚠ Dirección solicita que revises los siguientes productos y confirmes las cantidades.
+                    ⚠ Dirección solicita revisar estos productos. Recuenta físicamente y escribe la <b>nueva cantidad</b>; al guardarla, el estatus cambia a REVISADA y dirección lo verá de inmediato.
                   </div>
                 )}
                 <div style={{background:'#fff',borderRadius:10,border:'1px solid #eee',overflow:'hidden'}}>
+                  <div style={{overflowX:'auto'}}>
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                     <thead>
                       <tr>
-                        {['Producto','Impacto ($)','Estatus','Notas'].map(h=>(
-                          <th key={h} style={{textAlign:'left',padding:'9px 12px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12,background:'#f9f9f9'}}>{h}</th>
+                        {['Producto','Unidad','Cant. capturada','Nueva cantidad','Impacto ($)','Estatus','Notas'].map(h=>(
+                          <th key={h} style={{textAlign:'left',padding:'9px 12px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12,background:'#f9f9f9',whiteSpace:'nowrap'}}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {revisiones.map((r,i)=>(
-                        <tr key={i} style={{background:i%2?'#f9f9f9':'#fff'}}>
+                      {revisiones.map((r,i)=>{
+                        const prod = productos.find(p => (p.nombre||'').toUpperCase() === (r.producto||'').toUpperCase())
+                        const capturada = prod && cantidades[prod.id] !== undefined && cantidades[prod.id] !== '' ? parseFloat(cantidades[prod.id]) : null
+                        const revisada = r.estatus === 'REVISADA'
+                        return (
+                        <tr key={r.id||i} style={{background:i%2?'#f9f9f9':'#fff'}}>
                           <td style={{padding:'9px 12px',fontWeight:600}}>{r.producto}</td>
+                          <td style={{padding:'9px 12px',color:'#888',fontSize:12}}>{prod?.unidad || '—'}</td>
+                          <td style={{padding:'9px 12px',textAlign:'center',fontWeight:600}}>
+                            {capturada !== null ? capturada.toLocaleString('es-MX',{maximumFractionDigits:3}) : '—'}
+                          </td>
+                          <td style={{padding:'9px 12px'}}>
+                            <input
+                              key={(r.id||i)+'-nueva'}
+                              type="number" min="0" step="0.001"
+                              style={{width:90,padding:'5px 8px',border:'1px solid '+(revisada?'#639922':'#ddd'),borderRadius:6,fontSize:12,textAlign:'center',background:revisada?'#F4FAEC':'#fff'}}
+                              placeholder="0.000"
+                              defaultValue={r.cantidad_ajustada ?? ''}
+                              onKeyDown={e=>{ if(e.key==='Enter'){ e.preventDefault(); e.target.blur() } }}
+                              onBlur={async e=>{
+                                const val = e.target.value === '' ? null : parseFloat(e.target.value)
+                                if (val === null || isNaN(val)) return
+                                if (val === r.cantidad_ajustada) return
+                                // Guardar nueva cantidad y marcar como REVISADA
+                                await fetch('/api/revisiones', {
+                                  method:'PATCH',
+                                  headers:{'Content-Type':'application/json'},
+                                  body: JSON.stringify({ id: r.id, cantidad_ajustada: val, estatus:'REVISADA' })
+                                }).catch(()=>{})
+                                // Sincronizar el físico capturado SOLO si la revisión es de la semana actual
+                                if (prod && (r.semana == null || String(r.semana) === String(semana))) {
+                                  updateCantidad(prod.id, String(val))
+                                }
+                                // Refrescar estado local
+                                setRevisiones(prev => prev.map(x => x.id===r.id ? {...x, cantidad_ajustada: val, estatus:'REVISADA'} : x))
+                              }}
+                            />
+                          </td>
                           <td style={{padding:'9px 12px',color:'#C00000',fontWeight:600}}>
                             {r.impacto ? ('$'+Math.abs(r.impacto).toLocaleString('es-MX',{minimumFractionDigits:2})) : '—'}
                           </td>
                           <td style={{padding:'9px 12px'}}>
                             <span style={{
-                              background: r.estatus==='EN REVISIÓN'?'#FAEEDA':'#FCEBEB',
-                              color: r.estatus==='EN REVISIÓN'?'#854F0B':'#C00000',
-                              padding:'2px 8px',borderRadius:100,fontSize:11,fontWeight:700
-                            }}>{r.estatus}</span>
+                              background: revisada?'#EAF3DE': r.estatus==='EN REVISIÓN'?'#FAEEDA':'#FCEBEB',
+                              color: revisada?'#3B6D11': r.estatus==='EN REVISIÓN'?'#854F0B':'#C00000',
+                              padding:'2px 8px',borderRadius:100,fontSize:11,fontWeight:700,whiteSpace:'nowrap'
+                            }}>{revisada?'✓ REVISADA':r.estatus}</span>
                           </td>
                           <td style={{padding:'9px 12px',color:'#888',fontSize:12}}>{r.notas||'—'}</td>
                         </tr>
-                      ))}
+                      )})}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </>
             )}

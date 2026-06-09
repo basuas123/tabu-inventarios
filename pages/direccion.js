@@ -402,9 +402,9 @@ export default function DireccionPage() {
   }).length
   const sinDatos  = SUCURSALES.filter(s => !resumen[s.k] || resumen[s.k].capturados === 0).length
 
-  const ESTATUSES = ['PENDIENTE','EN REVISIÓN','CORREGIDO','CONFIRMADO','A COBRO']
-  const estColor  = { PENDIENTE:'#EF9F27',  'EN REVISIÓN':'#EF9F27', CORREGIDO:'#639922', CONFIRMADO:'#C00000', 'A COBRO':'#C00000' }
-  const estBg     = { PENDIENTE:'#FAEEDA', 'EN REVISIÓN':'#FAEEDA', CORREGIDO:'#EAF3DE', CONFIRMADO:'#FCEBEB', 'A COBRO':'#FCEBEB' }
+  const ESTATUSES = ['PENDIENTE','EN REVISIÓN','REVISADA','CORREGIDO','CONFIRMADO','A COBRO']
+  const estColor  = { PENDIENTE:'#EF9F27',  'EN REVISIÓN':'#EF9F27', REVISADA:'#3B6D11', CORREGIDO:'#639922', CONFIRMADO:'#C00000', 'A COBRO':'#C00000' }
+  const estBg     = { PENDIENTE:'#FAEEDA', 'EN REVISIÓN':'#FAEEDA', REVISADA:'#EAF3DE', CORREGIDO:'#EAF3DE', CONFIRMADO:'#FCEBEB', 'A COBRO':'#FCEBEB' }
 
   // Filtrar por semana global; registros sin semana se muestran siempre
   const enSemana = r => r.semana == null || String(r.semana) === String(semanaRef)
@@ -734,6 +734,7 @@ export default function DireccionPage() {
                               >
                                 <option value="PENDIENTE">Pendiente</option>
                                 <option value="EN REVISIÓN">En revisión</option>
+                                <option value="REVISADA">Revisada (sucursal)</option>
                                 <option value="CORREGIDO">Corregido</option>
                                 <option value="CONFIRMADO">Confirmado</option>
                                 <option value="A COBRO">A cobro</option>
@@ -766,7 +767,7 @@ export default function DireccionPage() {
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                     <thead>
                       <tr>
-                        {['Sucursal','Producto','Impacto ($)','Estatus','Notas','Acción'].map(h=>(
+                        {['Sucursal','Producto','Cant. nueva','Impacto ($)','Estatus','Notas','Acción'].map(h=>(
                           <th key={h} style={{textAlign:'left',padding:'7px 10px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12}}>{h}</th>
                         ))}
                       </tr>
@@ -776,6 +777,9 @@ export default function DireccionPage() {
                         <tr key={r.id||i} style={{background:i%2?'#f9f9f9':'#fff'}}>
                           <td style={{padding:'7px 10px',fontWeight:600}}>{r.sucursal}</td>
                           <td style={{padding:'7px 10px'}}>{r.producto}</td>
+                          <td style={{padding:'7px 10px',textAlign:'center',fontWeight:700,color:r.cantidad_ajustada!=null?'#3B6D11':'#bbb'}}>
+                            {r.cantidad_ajustada!=null ? parseFloat(r.cantidad_ajustada).toLocaleString('es-MX',{maximumFractionDigits:3}) : '—'}
+                          </td>
                           <td style={{padding:'7px 10px',fontWeight:600,color:'#C00000'}}>{r.impacto?fmt(r.impacto):'—'}</td>
                           <td style={{padding:'7px 10px'}}>
                             <span style={{background:estBg[r.estatus]||'#f5f5f5',color:estColor[r.estatus]||'#555',padding:'2px 8px',borderRadius:100,fontSize:11,fontWeight:700}}>
