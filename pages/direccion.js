@@ -175,6 +175,8 @@ export default function DireccionPage() {
   const semanasDesdeIni = semanasDisponibles.filter(s => s >= acumSemIni)
   const totalSemanasRango = acumSemFin - acumSemIni + 1
   const semanaActual = semana
+  // Semana de referencia para Revisión y cobro: la del análisis cargado, no la actual
+  const semanaRef = semanaAnalisis || semana
   const [semanaFiltro, setSemanaFiltro] = useState(getWeek())
   const [resumenFiltro, setResumenFiltro] = useState({})
 
@@ -353,7 +355,7 @@ export default function DireccionPage() {
     await fetch('/api/revisiones', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sucursal: suc, producto: prod, impacto: imp, estatus: 'PENDIENTE', notas: nota, semana, año: new Date().getFullYear() })
+      body: JSON.stringify({ sucursal: suc, producto: prod, impacto: imp, estatus: 'PENDIENTE', notas: nota, semana: semanaRef, año: new Date().getFullYear() })
     })
     cargarDatos()
   }
@@ -435,7 +437,7 @@ export default function DireccionPage() {
             if (tab === 'revision') {
               const sucNombre = SUCURSALES.find(s=>s.k===sucRevision)?.n || sucRevision
               const revFiltradas = sucRevision ? revisiones.filter(r => r.sucursal === sucNombre) : revisiones
-              exportarRevisionCobro({ sucursal: sucNombre, analisisSuc, revisiones: revFiltradas, semana, año: new Date().getFullYear() })
+              exportarRevisionCobro({ sucursal: sucNombre, analisisSuc, revisiones: revFiltradas, semana: semanaRef, año: new Date().getFullYear() })
             } else {
               exportarResumenDireccion({sucursales:SUCURSALES,resumen,semana,año:new Date().getFullYear()})
             }
@@ -569,7 +571,7 @@ export default function DireccionPage() {
 
               {sucRevision && !analisisSuc && (
                 <div style={{padding:'20px',textAlign:'center',color:'#888',fontSize:13,background:'#f9f9f9',borderRadius:8}}>
-                  Esta sucursal no tiene análisis de Soft cargado esta semana.<br/>
+                  Esta sucursal no tiene ningún análisis de Soft cargado.<br/>
                   <span style={{fontSize:12}}>Usa el botón "Cargar Soft" para generar el análisis.</span>
                 </div>
               )}
@@ -596,7 +598,7 @@ export default function DireccionPage() {
                       onClick={()=>{
                         const suc = SUCURSALES.find(s=>s.k===sucRevision)?.n||sucRevision
                         const revSuc = revisiones.filter(r=>r.sucursal===suc&&r.estatus==='CORREGIDO')
-                        exportarParaSoft({sucursal:suc, revisiones:revSuc, analisisSuc, semana, año:new Date().getFullYear()})
+                        exportarParaSoft({sucursal:suc, revisiones:revSuc, analisisSuc, semana: semanaRef, año:new Date().getFullYear()})
                       }}
                     >📤 Exportar para Soft</button>
                   </div>
@@ -649,7 +651,7 @@ export default function DireccionPage() {
                                   if (existing) {
                                     await fetch('/api/revisiones',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:existing.id,cantidad_ajustada:val})})
                                   } else {
-                                    await fetch('/api/revisiones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sucursal:suc,producto:r.nombre,impacto:r.imp,estatus:'PENDIENTE',cantidad_ajustada:val,notas:'',semana,año:new Date().getFullYear()})})
+                                    await fetch('/api/revisiones',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sucursal:suc,producto:r.nombre,impacto:r.imp,estatus:'PENDIENTE',cantidad_ajustada:val,notas:'',semana:semanaRef,año:new Date().getFullYear()})})
                                   }
                                   await cargarDatos()
                                 }}
@@ -684,7 +686,7 @@ export default function DireccionPage() {
                                         impacto: r.imp,
                                         estatus: nuevoEstatus,
                                         notas: '',
-                                        semana,
+                                        semana: semanaRef,
                                         año: new Date().getFullYear()
                                       })
                                     })
@@ -773,13 +775,13 @@ export default function DireccionPage() {
                 <select
                   style={{padding:'7px 12px',border:'1px solid #ddd',borderRadius:8,fontSize:13,flex:1,maxWidth:280}}
                   value={sucRevision}
-                  onChange={e=>setSucRevision(e.target.value)}
+                  onChange={e=>cargarAnalisisSucursal(e.target.value)}
                 >
                   <option value="">Selecciona una sucursal...</option>
                   {SUCURSALES.map(s=><option key={s.k} value={s.k}>{s.n}</option>)}
                 </select>
                 {sucRevision && (
-                  <span style={{fontSize:12,color:'#888'}}>Semana {semana}</span>
+                  <span style={{fontSize:12,color:'#888'}}>Semana {semanaRef}</span>
                 )}
               </div>
 
@@ -833,7 +835,7 @@ export default function DireccionPage() {
                                 style={{padding:'4px 10px',borderRadius:6,border:'none',background:'#002060',color:'#fff',cursor:'pointer',fontSize:11,fontWeight:600}}
                                 onClick={async ()=>{
                                   if(!confirm('¿Confirmar cobro de '+r.producto+'?')) return
-                                  await fetch('/api/revisiones',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:r.id,estatus:'CORREGIDO',notas:(r.notas?r.notas+' | ':'')+' Cobrado sem '+semana})})
+                                  await fetch('/api/revisiones',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:r.id,estatus:'CORREGIDO',notas:(r.notas?r.notas+' | ':'')+' Cobrado sem '+semanaRef})})
                                   await cargarDatos()
                                 }}
                               >✓ Cobrado</button>
@@ -854,7 +856,7 @@ export default function DireccionPage() {
                           const softProd = detalle.find(d => d.nombre === r.producto || d.nombre?.toUpperCase() === r.producto?.toUpperCase())
                           return { ...r, dif: softProd?.dif ?? null, unidad: softProd?.unidad || '' }
                         })
-                        exportarCobro({sucursal:nombreSuc,items:itemsEnriquecidos,total:totalSuc,semana,año:new Date().getFullYear()})
+                        exportarCobro({sucursal:nombreSuc,items:itemsEnriquecidos,total:totalSuc,semana:semanaRef,año:new Date().getFullYear()})
                       }}
                       >📄 Exportar comprobante</button>
                       <div style={{fontWeight:700,fontSize:15}}>
@@ -930,7 +932,6 @@ export default function DireccionPage() {
             </div>
           </>
         )}
-      </div>
 
         {tab === 'acumulado' && (
           <>

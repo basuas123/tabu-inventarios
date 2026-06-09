@@ -175,7 +175,7 @@ export default function InventarioPage() {
     const imp = dif * (p.costo || 0)
     if (Math.abs(dif) > 0.01) {
       if (imp < 0) totFalt += imp; else totSobr += imp
-      diffs.push({ ...p, f, ajustado, sistema, dif, imp })
+      diffs.push({ ...p, f, ajustado: f, sistema: f - dif, dif, imp })
     }
   })
   diffs.sort((a, b) => a.imp - b.imp)
