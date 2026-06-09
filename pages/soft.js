@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import * as XLSX from 'xlsx'
 
 import { exportarAnalisisSoft, imprimir } from '../lib/exportar'
+import { ordenarComoSoft } from '../lib/grupos'
 
 const SUCURSALES = [
   {k:'playas',n:'Playas de Tijuana'},
@@ -209,7 +210,9 @@ export default function SoftPage() {
       })
     })
 
-    resultados.sort((a,b) => (a.grupo||'').localeCompare(b.grupo||'') || (a.nombre||'').localeCompare(b.nombre||''))
+    const resultadosOrdenados = ordenarComoSoft(resultados)
+    resultados.length = 0
+    resultados.push(...resultadosOrdenados)
     const neto = totalFalt + totalSobr
     setAnalisis({ resultados, totalFalt, totalSobr, sinCruce: 0, neto })
     setTab('analisis')

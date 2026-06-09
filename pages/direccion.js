@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { exportarResumenDireccion, exportarRevisionCobro, exportarParaSoft, exportarCobro, imprimir } from '../lib/exportar'
+import { ordenarComoSoft } from '../lib/grupos'
 
 const MERMAS = {
   'PESCADOS Y MARISCOS':0.15,'CARNES Y AVES':0.12,'FRUTAS Y VERDURAS':0.20,
@@ -613,7 +614,7 @@ export default function DireccionPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {(analisisSuc.detalle||[]).filter(r=>r.resultado!=='OK').sort((a,b)=>(a.grupo||'').localeCompare(b.grupo||'')||(a.nombre||'').localeCompare(b.nombre||'')).map((r,i)=>(
+                        {ordenarComoSoft((analisisSuc.detalle||[]).filter(r=>r.resultado!=='OK')).map((r,i)=>(
                           <tr key={r.nombre} style={{background:i%2?'#f9f9f9':'#fff'}}>
                             <td style={{padding:'6px 8px',fontWeight:500}}>{r.nombre}</td>
                             <td style={{padding:'6px 8px',color:'#888',fontSize:11}}>{r.grupo}</td>
