@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
+import { ordenarComoSoft } from '../lib/grupos'
 // exportar loaded dynamically
 
 function getWeek() {
@@ -20,6 +21,12 @@ export default function InventarioPage() {
   const [savedMsg, setSavedMsg]   = useState(false)
   const [semana]                  = useState(getWeek())
   const [revisiones, setRevisiones] = useState([])
+  const [histSemanas, setHistSemanas] = useState([])     // semanas con datos
+  const [histSemana, setHistSemana]   = useState(null)   // semana seleccionada
+  const [histInv, setHistInv]         = useState({})     // semana → inventario
+  const [histAnal, setHistAnal]       = useState({})     // semana → análisis
+  const [histRevs, setHistRevs]       = useState([])     // todas las revisiones de la sucursal
+  const [histCargando, setHistCargando] = useState(false)
 
   useEffect(() => {
     const stored = localStorage.getItem('tabu_user')
@@ -151,6 +158,27 @@ export default function InventarioPage() {
     setGuardando(false)
   }
 
+  async function cargarHistorialSuc() {
+    if (!user) return
+    setHistCargando(true)
+    const año = new Date().getFullYear()
+    try {
+      const [invR, analR, revR] = await Promise.all([
+        fetch('/api/inventario?sucursal=' + user.key + '&año=' + año).then(r=>r.json()).catch(()=>({data:[]})),
+        fetch('/api/analisis?sucursal=' + user.key + '&año=' + año).then(r=>r.json()).catch(()=>({data:[]})),
+        fetch('/api/revisiones').then(r=>r.json()).catch(()=>({data:[]})),
+      ])
+      const invMap = {}, analMap = {}
+      ;(invR.data||[]).forEach(row => { if (invMap[row.semana] === undefined) invMap[row.semana] = row })
+      ;(analR.data||[]).forEach(row => { if (analMap[row.semana] === undefined) analMap[row.semana] = row.resultados })
+      const semanas = [...new Set([...Object.keys(invMap), ...Object.keys(analMap)].map(Number))].sort((a,b)=>b-a)
+      const misRevs = (revR.data||[]).filter(r => r.sucursal === user.nombre)
+      setHistInv(invMap); setHistAnal(analMap); setHistRevs(misRevs); setHistSemanas(semanas)
+      if (semanas.length && histSemana === null) setHistSemana(semanas[0])
+    } catch(e) {}
+    setHistCargando(false)
+  }
+
   function logout() {
     localStorage.removeItem('tabu_user')
     router.push('/')
@@ -222,6 +250,7 @@ export default function InventarioPage() {
           <button style={st.tab(tab==='revisiones')} onClick={()=>setTab('revisiones')}>
             {revisiones.length > 0 ? `⚠ Revisiones (${revisiones.length})` : 'Revisiones'}
           </button>
+          <button style={st.tab(tab==='historial')} onClick={()=>{setTab('historial');cargarHistorialSuc()}}>Historial</button>
         </div>
 
         {tab === 'captura' && (
@@ -406,6 +435,154 @@ export default function InventarioPage() {
                   </table>
                   </div>
                 </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {tab === 'historial' && (
+          <div style={{paddingBottom:20}}>
+            {histCargando ? (
+              <div style={{textAlign:'center',padding:40,color:'#888',fontSize:13}}>Cargando historial...</div>
+            ) : histSemanas.length === 0 ? (
+              <div style={{textAlign:'center',padding:40,color:'#888',fontSize:13}}>
+                Aún no hay semanas con datos para esta sucursal.
+              </div>
+            ) : (
+              <>
+                {/* Botones de semana */}
+                <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
+                  {histSemanas.map(s2 => (
+                    <button
+                      key={s2}
+                      onClick={()=>setHistSemana(s2)}
+                      style={{
+                        padding:'8px 16px',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:600,
+                        background:histSemana===s2?'#002060':'#f5f5f5',
+                        color:histSemana===s2?'#fff':'#333',
+                        border:histSemana===s2?'none':'1px solid #ddd',
+                      }}
+                    >
+                      Sem {s2}{s2===semana?' (actual)':''}
+                    </button>
+                  ))}
+                </div>
+
+                {histSemana !== null && (() => {
+                  const inv  = histInv[histSemana]
+                  const anal = histAnal[histSemana]
+                  const capturados = inv?.datos ? Object.values(inv.datos).filter(v=>v!==''&&v!==null&&v!==undefined).length : 0
+                  const revsSem = histRevs.filter(r => r.semana == null ? false : String(r.semana)===String(histSemana))
+                  const detalle = ordenarComoSoft((anal?.detalle||[]).filter(d=>d.resultado!=='OK'))
+                  return (
+                    <>
+                      {/* Resumen de captura */}
+                      <div style={st.card}>
+                        <div style={{display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:8,fontSize:13}}>
+                          <span><b>Semana {histSemana}</b> · Capturados: <b>{inv ? capturados : '—'}</b>{productos.length?` de ${productos.length}`:''}</span>
+                          <span style={{color:'#888'}}>Responsable: {inv?.responsable || '—'}</span>
+                        </div>
+                      </div>
+
+                      {/* KPIs del análisis */}
+                      {anal ? (
+                        <div style={{display:'flex',gap:10,marginBottom:12}}>
+                          <div style={st.kpi}>
+                            <div style={{fontSize:11,color:'#888',marginBottom:4}}>Pérdida ($)</div>
+                            <div style={{fontSize:18,fontWeight:700,color:'#C00000'}}>{fmt(anal.totalFalt||0)}</div>
+                          </div>
+                          <div style={st.kpi}>
+                            <div style={{fontSize:11,color:'#888',marginBottom:4}}>Sobrante ($)</div>
+                            <div style={{fontSize:18,fontWeight:700,color:'#3B6D11'}}>{fmt(anal.totalSobr||0)}</div>
+                          </div>
+                          <div style={st.kpi}>
+                            <div style={{fontSize:11,color:'#888',marginBottom:4}}>Impacto neto</div>
+                            <div style={{fontSize:18,fontWeight:700,color:(anal.neto||0)<0?'#C00000':'#3B6D11'}}>{fmt(anal.neto||0)}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{background:'#f9f9f9',borderRadius:8,padding:'12px 14px',marginBottom:12,fontSize:13,color:'#888',textAlign:'center'}}>
+                          Sin análisis de Soft para esta semana.
+                        </div>
+                      )}
+
+                      {/* Diferencias del análisis */}
+                      {detalle.length > 0 && (
+                        <div style={st.card}>
+                          <div style={{fontWeight:600,fontSize:13,marginBottom:10,color:'#555'}}>Productos con diferencia — Semana {histSemana}</div>
+                          <div style={{overflowX:'auto'}}>
+                            <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                              <thead>
+                                <tr>
+                                  {['Producto','Grupo','Unidad','Diferencia','Impacto ($)','Resultado'].map(h=>(
+                                    <th key={h} style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:11,whiteSpace:'nowrap'}}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {detalle.map((d,i)=>(
+                                  <tr key={d.nombre+i} style={{background:i%2?'#f9f9f9':'#fff'}}>
+                                    <td style={{padding:'6px 8px',fontWeight:500}}>{d.nombre}</td>
+                                    <td style={{padding:'6px 8px',color:'#888',fontSize:11}}>{d.grupo||'—'}</td>
+                                    <td style={{padding:'6px 8px',color:'#888',fontSize:11}}>{d.unidad||'—'}</td>
+                                    <td style={{padding:'6px 8px',textAlign:'right',color:d.dif<0?'#C00000':'#3B6D11',fontWeight:600}}>
+                                      {d.dif>0?'+':''}{parseFloat(d.dif||0).toFixed(3)}
+                                    </td>
+                                    <td style={{padding:'6px 8px',textAlign:'right',fontWeight:600,color:d.imp<0?'#C00000':'#3B6D11'}}>
+                                      {d.imp<0?'-':''}{fmt(d.imp||0)}
+                                    </td>
+                                    <td style={{padding:'6px 8px'}}>
+                                      <span style={st.badge(d.imp)}>{d.resultado}</span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Revisiones de esa semana */}
+                      {revsSem.length > 0 && (
+                        <div style={st.card}>
+                          <div style={{fontWeight:600,fontSize:13,marginBottom:10,color:'#555'}}>Revisiones de dirección — Semana {histSemana}</div>
+                          <div style={{overflowX:'auto'}}>
+                            <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                              <thead>
+                                <tr>
+                                  {['Producto','Nueva cantidad','Impacto ($)','Estatus','Notas'].map(h=>(
+                                    <th key={h} style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:11,whiteSpace:'nowrap'}}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {revsSem.map((r,i)=>(
+                                  <tr key={r.id||i} style={{background:i%2?'#f9f9f9':'#fff'}}>
+                                    <td style={{padding:'6px 8px',fontWeight:600}}>{r.producto}</td>
+                                    <td style={{padding:'6px 8px',textAlign:'center',fontWeight:700,color:r.cantidad_ajustada!=null?'#3B6D11':'#bbb'}}>
+                                      {r.cantidad_ajustada!=null ? parseFloat(r.cantidad_ajustada).toLocaleString('es-MX',{maximumFractionDigits:3}) : '—'}
+                                    </td>
+                                    <td style={{padding:'6px 8px',color:'#C00000',fontWeight:600}}>
+                                      {r.impacto ? ('$'+Math.abs(r.impacto).toLocaleString('es-MX',{minimumFractionDigits:2})) : '—'}
+                                    </td>
+                                    <td style={{padding:'6px 8px'}}>
+                                      <span style={{
+                                        background: r.estatus==='REVISADA'||r.estatus==='CORREGIDO'?'#EAF3DE': r.estatus==='EN REVISIÓN'||r.estatus==='PENDIENTE'?'#FAEEDA':'#FCEBEB',
+                                        color: r.estatus==='REVISADA'||r.estatus==='CORREGIDO'?'#3B6D11': r.estatus==='EN REVISIÓN'||r.estatus==='PENDIENTE'?'#854F0B':'#C00000',
+                                        padding:'2px 8px',borderRadius:100,fontSize:11,fontWeight:700,whiteSpace:'nowrap'
+                                      }}>{r.estatus}</span>
+                                    </td>
+                                    <td style={{padding:'6px 8px',color:'#888',fontSize:11}}>{r.notas||'—'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </>
             )}
           </div>
