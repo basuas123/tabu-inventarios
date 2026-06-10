@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { ordenarComoSoft } from '../lib/grupos'
 // exportar loaded dynamically
@@ -521,7 +521,16 @@ export default function InventarioPage() {
                   const anal = histAnal[histSemana]
                   const capturados = inv?.datos ? Object.values(inv.datos).filter(v=>v!==''&&v!==null&&v!==undefined).length : 0
                   const revsSem = histRevs.filter(r => r.semana == null ? false : String(r.semana)===String(histSemana))
-                  const detalle = ordenarComoSoft((anal?.detalle||[]).filter(d=>d.resultado!=='OK'))
+                  // Enriquecer con grupo/unidad del catálogo (análisis viejos no traen grupo)
+                  const catMap = {}
+                  productos.forEach(pr => { catMap[(pr.nombre||'').toUpperCase()] = pr })
+                  const enriquecido = (anal?.detalle||[]).map(d => {
+                    const c = catMap[(d.nombre||'').toUpperCase()]
+                    return { ...d, grupo: d.grupo || c?.grupo || '', unidad: d.unidad || c?.unidad || '',
+                             capturado: d.fisico ?? (c && inv?.datos ? inv.datos[c.id] : null) }
+                  })
+                  const detalle = ordenarComoSoft(enriquecido.filter(d=>d.resultado!=='OK'))
+                  const gruposDet = [...new Set(detalle.map(d=>d.grupo||''))]
                   return (
                     <>
                       {/* Resumen de captura */}
@@ -562,27 +571,41 @@ export default function InventarioPage() {
                             <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
                               <thead>
                                 <tr>
-                                  {['Producto','Grupo','Unidad','Diferencia','Impacto ($)','Resultado'].map(h=>(
+                                  {['Producto','Unidad','Capturado','Sistema (Soft)','Diferencia','Impacto ($)','Resultado'].map(h=>(
                                     <th key={h} style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:11,whiteSpace:'nowrap'}}>{h}</th>
                                   ))}
                                 </tr>
                               </thead>
                               <tbody>
-                                {detalle.map((d,i)=>(
-                                  <tr key={d.nombre+i} style={{background:i%2?'#f9f9f9':'#fff'}}>
-                                    <td style={{padding:'6px 8px',fontWeight:500}}>{d.nombre}</td>
-                                    <td style={{padding:'6px 8px',color:'#888',fontSize:11}}>{d.grupo||'—'}</td>
-                                    <td style={{padding:'6px 8px',color:'#888',fontSize:11}}>{d.unidad||'—'}</td>
-                                    <td style={{padding:'6px 8px',textAlign:'right',color:d.dif<0?'#C00000':'#3B6D11',fontWeight:600}}>
-                                      {d.dif>0?'+':''}{parseFloat(d.dif||0).toFixed(3)}
-                                    </td>
-                                    <td style={{padding:'6px 8px',textAlign:'right',fontWeight:600,color:d.imp<0?'#C00000':'#3B6D11'}}>
-                                      {d.imp<0?'-':''}{fmt(d.imp||0)}
-                                    </td>
-                                    <td style={{padding:'6px 8px'}}>
-                                      <span style={st.badge(d.imp)}>{d.resultado}</span>
-                                    </td>
-                                  </tr>
+                                {gruposDet.map(g => (
+                                  <React.Fragment key={g||'singrupo'}>
+                                    <tr>
+                                      <td colSpan={7} style={{padding:'5px 10px',background:'#2E75B6',color:'#fff',fontWeight:700,fontSize:11,borderRadius:0}}>
+                                        {g || 'SIN GRUPO'}
+                                      </td>
+                                    </tr>
+                                    {detalle.filter(d=>(d.grupo||'')===g).map((d,i)=>(
+                                      <tr key={d.nombre+i} style={{background:i%2?'#f9f9f9':'#fff'}}>
+                                        <td style={{padding:'6px 8px',fontWeight:500}}>{d.nombre}</td>
+                                        <td style={{padding:'6px 8px',color:'#888',fontSize:11}}>{d.unidad||'—'}</td>
+                                        <td style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:'#002060'}}>
+                                          {d.capturado!=null && d.capturado!=='' ? parseFloat(d.capturado).toLocaleString('es-MX',{maximumFractionDigits:3}) : '—'}
+                                        </td>
+                                        <td style={{padding:'6px 8px',textAlign:'right',color:'#555'}}>
+                                          {d.sistema!=null ? parseFloat(d.sistema).toLocaleString('es-MX',{maximumFractionDigits:3}) : '—'}
+                                        </td>
+                                        <td style={{padding:'6px 8px',textAlign:'right',color:d.dif<0?'#C00000':'#3B6D11',fontWeight:600}}>
+                                          {d.dif>0?'+':''}{parseFloat(d.dif||0).toFixed(3)}
+                                        </td>
+                                        <td style={{padding:'6px 8px',textAlign:'right',fontWeight:600,color:d.imp<0?'#C00000':'#3B6D11'}}>
+                                          {d.imp<0?'-':''}{fmt(d.imp||0)}
+                                        </td>
+                                        <td style={{padding:'6px 8px'}}>
+                                          <span style={st.badge(d.imp)}>{d.resultado}</span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </React.Fragment>
                                 ))}
                               </tbody>
                             </table>
