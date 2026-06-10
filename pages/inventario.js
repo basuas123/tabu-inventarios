@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { ordenarComoSoft } from '../lib/grupos'
 // exportar loaded dynamically
@@ -27,6 +27,10 @@ export default function InventarioPage() {
   const [histAnal, setHistAnal]       = useState({})     // semana → análisis
   const [histRevs, setHistRevs]       = useState([])     // todas las revisiones de la sucursal
   const [histCargando, setHistCargando] = useState(false)
+  const [cambios, setCambios] = useState([])           // pila de cambios para Deshacer (máx 50)
+  const cantidadesRef = useRef({})
+
+  useEffect(() => { cantidadesRef.current = cantidades }, [cantidades])
 
   useEffect(() => {
     const stored = localStorage.getItem('tabu_user')
@@ -78,8 +82,18 @@ export default function InventarioPage() {
       })
   }, [])
 
-  const updateCantidad = useCallback((id, val) => {
+  const updateCantidad = useCallback((id, val, skipHist) => {
     const parsed = val === '' ? '' : parseFloat(val)
+
+    // Registrar valor anterior para Deshacer (una entrada por producto editado)
+    if (!skipHist) {
+      const prevVal = cantidadesRef.current[id]
+      setCambios(prev => {
+        const last = prev[prev.length - 1]
+        if (last && last.tipo === 'captura-item' && last.id === id) return prev
+        return [...prev.slice(-49), { tipo: 'captura-item', id, prev: prevVal }]
+      })
+    }
 
     // Actualizar estado local inmediatamente
     setCantidades(prev => {
@@ -177,6 +191,38 @@ export default function InventarioPage() {
       if (semanas.length && histSemana === null) setHistSemana(semanas[0])
     } catch(e) {}
     setHistCargando(false)
+  }
+
+  async function deshacer() {
+    if (!cambios.length) return
+    const u = cambios[cambios.length - 1]
+    setCambios(prev => prev.slice(0, -1))
+
+    if (u.tipo === 'captura-todo') {
+      // Restaurar snapshot completo y persistir
+      setCantidades(u.snapshot)
+      localStorage.setItem('inv_' + user.key + '_sem' + semana, JSON.stringify(u.snapshot))
+      fetch('/api/inventario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sucursal: user.key, semana, año: new Date().getFullYear(), datos: u.snapshot, responsable })
+      }).catch(()=>{})
+      setSavedMsg(true); setTimeout(()=>setSavedMsg(false), 2000)
+    }
+
+    if (u.tipo === 'captura-item') {
+      // Restaurar el valor anterior de ese producto (sin volver a apilar)
+      updateCantidad(u.id, u.prev === undefined || u.prev === null ? '' : String(u.prev), true)
+    }
+
+    if (u.tipo === 'revision') {
+      await fetch('/api/revisiones', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: u.id, cantidad_ajustada: u.prev.cantidad_ajustada, estatus: u.prev.estatus })
+      }).catch(()=>{})
+      setRevisiones(prev => prev.map(x => x.id === u.id ? { ...x, cantidad_ajustada: u.prev.cantidad_ajustada, estatus: u.prev.estatus } : x))
+    }
   }
 
   function logout() {
@@ -393,7 +439,7 @@ export default function InventarioPage() {
                           </td>
                           <td style={{padding:'9px 12px'}}>
                             <input
-                              key={(r.id||i)+'-nueva'}
+                              key={(r.id||i)+'-'+(r.cantidad_ajustada??'')+'-nueva'}
                               type="number" min="0" step="0.001"
                               style={{width:90,padding:'5px 8px',border:'1px solid '+(revisada?'#639922':'#ddd'),borderRadius:6,fontSize:12,textAlign:'center',background:revisada?'#F4FAEC':'#fff'}}
                               placeholder="0.000"
@@ -403,6 +449,8 @@ export default function InventarioPage() {
                                 const val = e.target.value === '' ? null : parseFloat(e.target.value)
                                 if (val === null || isNaN(val)) return
                                 if (val === r.cantidad_ajustada) return
+                                // Registrar estado anterior para Deshacer
+                                setCambios(prev => [...prev.slice(-49), { tipo:'revision', id: r.id, prev: { cantidad_ajustada: r.cantidad_ajustada ?? null, estatus: r.estatus } }])
                                 // Guardar nueva cantidad y marcar como REVISADA
                                 await fetch('/api/revisiones', {
                                   method:'PATCH',
@@ -658,7 +706,20 @@ export default function InventarioPage() {
           <span style={{fontSize:12,color:'#888'}}>Guardado automático activado</span>
         )}
         <div style={{display:'flex',gap:8}}>
-          <button style={st.btn} onClick={()=>{ if(confirm('¿Limpiar todo?')){ setCantidades({}); localStorage.removeItem(`inv_${user.key}_sem${semana}`) } }}>
+          <button
+            style={{...st.btn, opacity: cambios.length ? 1 : 0.4, cursor: cambios.length ? 'pointer' : 'default'}}
+            disabled={!cambios.length}
+            onClick={deshacer}
+            title={!cambios.length ? 'Sin cambios que revertir' :
+              cambios[cambios.length-1].tipo==='captura-todo' ? 'Revertir el Limpiar' :
+              cambios[cambios.length-1].tipo==='revision' ? 'Revertir última revisión' : 'Revertir última cantidad'}
+          >↩ Deshacer{cambios.length ? ` (${cambios.length})` : ''}</button>
+          <button style={st.btn} onClick={()=>{
+            if(!confirm('¿Limpiar todo? Podrás revertirlo con Deshacer.')) return
+            setCambios(prev => [...prev.slice(-49), { tipo:'captura-todo', snapshot: { ...cantidadesRef.current } }])
+            setCantidades({})
+            localStorage.removeItem(`inv_${user.key}_sem${semana}`)
+          }}>
             Limpiar
           </button>
           <button style={st.btnPr} onClick={guardar} disabled={guardando}>
