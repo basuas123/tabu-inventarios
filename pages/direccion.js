@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { exportarResumenDireccion, exportarRevisionCobro, exportarParaSoft, exportarCobro, imprimir } from '../lib/exportar'
 import { ordenarComoSoft } from '../lib/grupos'
+import RevisionSemanal from '../components/RevisionSemanal'
 
 const MERMAS = {
   'PESCADOS Y MARISCOS':0.15,'CARNES Y AVES':0.12,'FRUTAS Y VERDURAS':0.20,
@@ -487,6 +488,7 @@ export default function DireccionPage() {
         <div style={st.tabs}>
           <button style={st.tab(tab==='sucursales')} onClick={()=>setTab('sucursales')}>Sucursales</button>
           <button style={st.tab(tab==='revision')}   onClick={()=>setTab('revision')}>Revisión y cobro</button>
+          <button style={st.tab(tab==='semanal')}   onClick={()=>setTab('semanal')}>Revisión semanal</button>
           <button style={st.tab(tab==='cobros')}    onClick={()=>setTab('cobros')}>
             {cobrosSemana.length ? '💰 A cobrar ('+cobrosSemana.length+')' : 'A cobrar'}
           </button>
@@ -805,6 +807,8 @@ export default function DireccionPage() {
             </div>
           </>
         )}
+
+        {tab === 'semanal' && <RevisionSemanal key={semanaRef} SUCURSALES={SUCURSALES} semanaInicial={semanaRef} />}
 
         {tab === 'cobros' && (
           <>
