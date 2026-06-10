@@ -894,7 +894,7 @@ export default function DireccionPage() {
                         const detalle = analisisSuc?.detalle || []
                         const itemsEnriquecidos = itemsSuc.map(r => {
                           const softProd = detalle.find(d => d.nombre === r.producto || d.nombre?.toUpperCase() === r.producto?.toUpperCase())
-                          return { ...r, dif: softProd?.dif ?? null, unidad: softProd?.unidad || '' }
+                          return { ...r, dif: softProd?.dif ?? null, unidad: softProd?.unidad || '', grupo: softProd?.grupo || '' }
                         })
                         exportarCobro({sucursal:nombreSuc,items:itemsEnriquecidos,total:totalSuc,semana:semanaRef,año:new Date().getFullYear()})
                       }}
