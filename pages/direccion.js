@@ -173,6 +173,7 @@ export default function DireccionPage() {
   const [acumData, setAcumData]     = useState(null)
   const [acumCargando, setAcumCargando] = useState(false)
   const [acumSucDetalle, setAcumSucDetalle] = useState(null)
+  const [sucCobroDetalle, setSucCobroDetalle] = useState(null)
   const semanasDisponibles = Array.from({length:semana},(_,i)=>i+1)
   const semanasDesdeIni = semanasDisponibles.filter(s => s >= acumSemIni)
   const totalSemanasRango = acumSemFin - acumSemIni + 1
@@ -412,6 +413,9 @@ export default function DireccionPage() {
   const revisionesSemana = revisiones.filter(enSemana)
   const cobrosSemana = cobros.filter(enSemana)
   const totalCobro = cobrosSemana.reduce((a,r) => a + Math.abs(r.impacto || 0), 0)
+  // Lo enviado a cobro (incluye ya cobrados) por sucursal en la semana seleccionada
+  const esCobro = r => r.estatus === 'A COBRO' || String(r.notas||'').includes('Cobrado')
+  const cobrosSucSemana = nombre => revisionesSemana.filter(r => r.sucursal === nombre && esCobro(r))
 
   const st = {
     topbar: { background:'#fff', borderBottom:'1px solid #eee', padding:'0 16px', display:'flex', alignItems:'center', justifyContent:'space-between', height:52, position:'sticky', top:0, zIndex:100 },
@@ -545,7 +549,7 @@ export default function DireccionPage() {
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                 <thead>
                   <tr>
-                    {['','Sucursal','Capturados','Faltante ($)','Sobrante ($)','Impacto neto ($)','Estado','Responsable'].map(h=>(
+                    {['','Sucursal','Capturados','Faltante ($)','Sobrante ($)','Impacto neto ($)','Estado','A cobro (sem)','Responsable'].map(h=>(
                       <th key={h} style={{textAlign:'left',padding:'8px 10px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,whiteSpace:'nowrap',fontSize:12}}>{h}</th>
                     ))}
                   </tr>
@@ -578,6 +582,20 @@ export default function DireccionPage() {
                             {estado}
                           </span>
                         </td>
+                        <td style={{padding:'8px 10px'}}>
+                          {(() => {
+                            const items = cobrosSucSemana(s.n)
+                            if (items.length === 0) return <span style={{color:'#ccc'}}>—</span>
+                            const tot = items.reduce((a,c)=>a+Math.abs(c.impacto||0),0)
+                            const abierto = sucCobroDetalle === s.k
+                            return (
+                              <button
+                                style={{padding:'3px 10px',borderRadius:6,border:'1px solid #f0c3c3',background:abierto?'#C00000':'#FCEBEB',color:abierto?'#fff':'#A32D2D',cursor:'pointer',fontSize:11,fontWeight:700,whiteSpace:'nowrap'}}
+                                onClick={()=>setSucCobroDetalle(abierto?null:s.k)}
+                              >{fmt(tot)} · {items.length} art. {abierto?'▲':'▼'}</button>
+                            )
+                          })()}
+                        </td>
                         <td style={{padding:'8px 10px',color:'#888',fontSize:12}}>{r?.responsable || '—'}</td>
                       </tr>
                     )
@@ -585,6 +603,44 @@ export default function DireccionPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Detalle de artículos a cobro de la sucursal seleccionada */}
+            {sucCobroDetalle && (() => {
+              const sucSel = SUCURSALES.find(x=>x.k===sucCobroDetalle)
+              const items = cobrosSucSemana(sucSel?.n)
+              const tot = items.reduce((a,c)=>a+Math.abs(c.impacto||0),0)
+              return (
+                <div style={{marginTop:14,background:'#f9f9f9',borderRadius:10,padding:'14px 18px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                    <div style={{fontWeight:700,fontSize:13}}>{sucSel?.n} — Enviado a cobro · Semana {semanaRef}</div>
+                    <div style={{fontWeight:700,fontSize:15,color:'#C00000'}}>{fmt(tot)}</div>
+                  </div>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                    <thead>
+                      <tr>
+                        {['Artículo','Costo ($)','Estatus','Notas'].map(h=>(
+                          <th key={h} style={{textAlign:'left',padding:'6px 8px',borderBottom:'1px solid #e5e5e5',color:'#888',fontWeight:600,fontSize:11}}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((c,j)=>(
+                        <tr key={c.id||j} style={{background:j%2?'#f3f3f3':'transparent'}}>
+                          <td style={{padding:'6px 8px',fontWeight:600}}>{c.producto}</td>
+                          <td style={{padding:'6px 8px',fontWeight:700,color:'#C00000'}}>{fmt(Math.abs(c.impacto||0))}</td>
+                          <td style={{padding:'6px 8px'}}>
+                            <span style={{background:String(c.notas||'').includes('Cobrado')?'#EAF3DE':'#FCEBEB',color:String(c.notas||'').includes('Cobrado')?'#3B6D11':'#A32D2D',padding:'2px 8px',borderRadius:100,fontSize:10,fontWeight:700}}>
+                              {String(c.notas||'').includes('Cobrado')?'COBRADO':'A COBRO'}
+                            </span>
+                          </td>
+                          <td style={{padding:'6px 8px',color:'#888',fontSize:11}}>{c.notas||'—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })()}
           </div>
         )}
 
