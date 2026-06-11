@@ -22,6 +22,7 @@ export default function InventarioPage() {
   const [semana]                  = useState(getWeek())
   const [revisiones, setRevisiones] = useState([])
   const [cobrosSuc, setCobrosSuc] = useState([])      // artículos enviados a cobro / cobrados de esta sucursal
+  const [analisisCobros, setAnalisisCobros] = useState([])  // análisis Soft por semana, para cantidades de cobro
   const [histSemanas, setHistSemanas] = useState([])     // semanas con datos
   const [histSemana, setHistSemana]   = useState(null)   // semana seleccionada
   const [histInv, setHistInv]         = useState({})     // semana → inventario
@@ -68,6 +69,12 @@ export default function InventarioPage() {
           ))
         }
       })
+      .catch(() => {})
+
+    // Análisis Soft históricos — para mostrar cantidades en la pestaña Cobros
+    fetch('/api/analisis?sucursal=' + u.key + '&año=' + new Date().getFullYear())
+      .then(r => r.json())
+      .then(({ data }) => { if (data) setAnalisisCobros(data) })
       .catch(() => {})
 
     fetch('/api/inventario?sucursal=' + u.key + '&semana=' + getWeek() + '&año=' + new Date().getFullYear())
@@ -506,6 +513,20 @@ export default function InventarioPage() {
             ) : (() => {
               const fmtC = n => '$' + Math.abs(parseFloat(n)||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})
               const yaCobrado = r => String(r.notas||'').includes('Cobrado')
+              // Cantidad faltante en la semana del cobro, del análisis Soft de esa semana
+              const cantidadCobro = (producto, sem) => {
+                const nombre = String(producto||'').toUpperCase().trim()
+                for (const a of analisisCobros) {
+                  if (sem != null && String(a.semana) !== String(sem)) continue
+                  const det = a.resultados?.detalle || []
+                  const hit = det.find(d => String(d.nombre||'').toUpperCase().trim() === nombre)
+                  if (hit && hit.dif != null) {
+                    const unidad = hit.unidad || productos.find(p => (p.nombre||'').toUpperCase() === nombre)?.unidad || ''
+                    return Math.abs(parseFloat(hit.dif)||0).toLocaleString('es-MX',{maximumFractionDigits:3}) + ' ' + unidad
+                  }
+                }
+                return null
+              }
               // Agrupar por semana, más reciente primero
               const porSemana = {}
               cobrosSuc.forEach(r => {
@@ -537,7 +558,7 @@ export default function InventarioPage() {
                           <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                             <thead>
                               <tr>
-                                {['Artículo','Costo ($)','Estatus','Notas'].map(h=>(
+                                {['Artículo','Cantidad','Costo ($)','Estatus','Notas'].map(h=>(
                                   <th key={h} style={{textAlign:'left',padding:'8px 12px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12}}>{h}</th>
                                 ))}
                               </tr>
@@ -546,6 +567,7 @@ export default function InventarioPage() {
                               {items.map((r,i)=>(
                                 <tr key={r.id||i} style={{background:i%2?'#f9f9f9':'#fff'}}>
                                   <td style={{padding:'8px 12px',fontWeight:600}}>{r.producto}</td>
+                                  <td style={{padding:'8px 12px',fontWeight:700,color:'#A32D2D',whiteSpace:'nowrap'}}>{cantidadCobro(r.producto, r.semana) || '—'}</td>
                                   <td style={{padding:'8px 12px',fontWeight:700,color:'#C00000'}}>{fmtC(r.impacto)}</td>
                                   <td style={{padding:'8px 12px'}}>
                                     <span style={{background:yaCobrado(r)?'#EAF3DE':'#FCEBEB',color:yaCobrado(r)?'#3B6D11':'#A32D2D',padding:'2px 8px',borderRadius:100,fontSize:11,fontWeight:700,whiteSpace:'nowrap'}}>
