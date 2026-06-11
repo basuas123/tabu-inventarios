@@ -110,6 +110,22 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
         if (!prev || num(r.semana) > num(prev.semana)) cobroPorProducto[p] = r
       }
 
+      // 1b. Análisis Soft históricos: cantidad que faltó en la semana del cobro
+      let analisisHist = []
+      try {
+        const rAn = await fetch('/api/analisis?sucursal=' + sucKey + '&año=' + año)
+        analisisHist = (await rAn.json()).data || []
+      } catch (e2) {}
+      function difEnSemana(producto, sem2) {
+        for (const a of analisisHist) {
+          if (num(a.semana) !== num(sem2)) continue
+          const det = a.resultados?.detalle || []
+          const hit = det.find(d => String(d.nombre || '').toUpperCase().trim() === producto)
+          if (hit && hit.dif != null) return num(hit.dif)
+        }
+        return null
+      }
+
       // 2. Catálogo de la sucursal (id, grupo, unidad, costo)
       const rCat = await fetch('/api/productos?sucursal=' + sucKey)
       const jCat = await rCat.json()
@@ -145,6 +161,7 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
           grupo: cat.grupo || '',
           unidad: cat.unidad || '',
           cobro: cobroPorProducto[nom],
+          cobroDif: difEnSemana(nom, cobroPorProducto[nom]?.semana),
         }
       }
       setFilas(nuevas)
@@ -295,13 +312,13 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
     const filasXls = [
       ['REVISIÓN SEMANAL — ' + nombreSuc.toUpperCase() + ' — SEMANA ' + semana + ' / ' + año],
       [],
-      ['PRODUCTO', 'INV SEM ANTERIOR (' + ant.semana + ')', 'COMPRAS', 'VENTAS', 'INV ESTA SEMANA', 'DIFERENCIA', 'MERMA', 'DIF NETA', 'COSTO UNIT', 'IMPACTO $', 'ÁREA', 'ESTADO', 'NOTAS'],
+      ['PRODUCTO', 'CANT. COBRO PREVIO', 'INV SEM ANTERIOR (' + ant.semana + ')', 'COMPRAS', 'VENTAS', 'INV ESTA SEMANA', 'DIFERENCIA', 'MERMA', 'DIF NETA', 'COSTO UNIT', 'IMPACTO $', 'ÁREA', 'ESTADO', 'NOTAS'],
     ]
     for (const nom of orden) {
       const f = filas[nom]
       const { dif, difNeta, impacto } = calcular(f)
       filasXls.push([
-        nom, num(f.b), num(f.c), num(f.d), num(f.e),
+        nom, f.cobroDif !== null && f.cobroDif !== undefined ? f.cobroDif : '', num(f.b), num(f.c), num(f.d), num(f.e),
         dif === null ? '' : dif, num(f.merma), difNeta === null ? '' : difNeta,
         num(f.costo), impacto === null ? '' : impacto,
         esBarra(f.grupo) ? 'BARRA' : 'COCINA', estado(difNeta).t, f.nota || '',
@@ -397,7 +414,7 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr>
-                  {['Producto', 'Cobro previo', 'Inv. sem. anterior', 'Compras', 'Ventas', 'Inv. esta semana', 'Diferencia', 'Merma', 'Dif. neta', 'Costo unit.', 'Impacto $', 'Estado', 'Notas'].map(h => (
+                  {['Producto', 'Cobro previo (cant. y $)', 'Inv. sem. anterior', 'Compras', 'Ventas', 'Inv. esta semana', 'Diferencia', 'Merma', 'Dif. neta', 'Costo unit.', 'Impacto $', 'Estado', 'Notas'].map(h => (
                     <th key={h} style={{ textAlign: 'left', padding: '7px 8px', borderBottom: '1px solid #eee', color: '#888', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -417,6 +434,9 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
                       </td>
                       <td style={{ padding: '6px 8px', fontSize: 11, color: '#888', whiteSpace: 'nowrap' }}>
                         S{f.cobro?.semana} · {f.cobro?.estatus}
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#A32D2D' }}>
+                          {f.cobroDif !== null && f.cobroDif !== undefined ? fmtQ(f.cobroDif) + ' ' + (f.unidad || '') : ''}
+                        </div>
                         <div style={{ fontSize: 10 }}>{fmt$(f.cobro?.impacto)}</div>
                       </td>
                       <td style={{ padding: '6px 4px' }}><input data-rev-nav type="number" step="0.001" style={inp} value={f.b} onChange={e => setCampo(nom, 'b', e.target.value)} onKeyDown={navegarEnter} /></td>
