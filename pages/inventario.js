@@ -21,6 +21,7 @@ export default function InventarioPage() {
   const [savedMsg, setSavedMsg]   = useState(false)
   const [semana]                  = useState(getWeek())
   const [revisiones, setRevisiones] = useState([])
+  const [cobrosSuc, setCobrosSuc] = useState([])      // artículos enviados a cobro / cobrados de esta sucursal
   const [histSemanas, setHistSemanas] = useState([])     // semanas con datos
   const [histSemana, setHistSemana]   = useState(null)   // semana seleccionada
   const [histInv, setHistInv]         = useState({})     // semana → inventario
@@ -60,6 +61,11 @@ export default function InventarioPage() {
             (r.estatus === 'EN REVISIÓN' || r.estatus === 'CONFIRMADO' || r.estatus === 'A COBRO' || r.estatus === 'REVISADA')
           )
           setRevisiones(misSucursal)
+          // Cobros: todo lo enviado a cobro (pendiente o ya cobrado)
+          setCobrosSuc(data.filter(r =>
+            r.sucursal === u.nombre &&
+            (r.estatus === 'A COBRO' || String(r.notas||'').includes('Cobrado'))
+          ))
         }
       })
       .catch(() => {})
@@ -296,6 +302,9 @@ export default function InventarioPage() {
           <button style={st.tab(tab==='revisiones')} onClick={()=>setTab('revisiones')}>
             {revisiones.length > 0 ? `⚠ Revisiones (${revisiones.length})` : 'Revisiones'}
           </button>
+          <button style={st.tab(tab==='cobros')} onClick={()=>setTab('cobros')}>
+            {cobrosSuc.length > 0 ? `💰 Cobros (${cobrosSuc.length})` : 'Cobros'}
+          </button>
           <button style={st.tab(tab==='historial')} onClick={()=>{setTab('historial');cargarHistorialSuc()}}>Historial</button>
         </div>
 
@@ -485,6 +494,76 @@ export default function InventarioPage() {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {tab === 'cobros' && (
+          <div style={{paddingBottom:20}}>
+            {cobrosSuc.length === 0 ? (
+              <div style={{textAlign:'center',padding:40,color:'#888',fontSize:13}}>
+                Sin cobros registrados para esta sucursal.
+              </div>
+            ) : (() => {
+              const fmtC = n => '$' + Math.abs(parseFloat(n)||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})
+              const yaCobrado = r => String(r.notas||'').includes('Cobrado')
+              // Agrupar por semana, más reciente primero
+              const porSemana = {}
+              cobrosSuc.forEach(r => {
+                const s = r.semana != null ? r.semana : 'Sin semana'
+                if (!porSemana[s]) porSemana[s] = []
+                porSemana[s].push(r)
+              })
+              const semanasOrd = Object.keys(porSemana).sort((a,b) => (parseInt(b)||0) - (parseInt(a)||0))
+              const totalGral = cobrosSuc.reduce((a,r) => a + Math.abs(r.impacto||0), 0)
+              return (
+                <>
+                  <div style={{background:'#FCEBEB',borderRadius:10,padding:'14px 18px',marginBottom:16,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <div>
+                      <div style={{fontWeight:700,fontSize:14,color:'#C00000'}}>Artículos enviados a cobro</div>
+                      <div style={{fontSize:12,color:'#888',marginTop:2}}>{cobrosSuc.length} artículos · incluye pendientes y ya cobrados</div>
+                    </div>
+                    <div style={{fontSize:24,fontWeight:700,color:'#C00000'}}>{fmtC(totalGral)}</div>
+                  </div>
+                  {semanasOrd.map(s => {
+                    const items = porSemana[s]
+                    const totSem = items.reduce((a,r) => a + Math.abs(r.impacto||0), 0)
+                    return (
+                      <div key={s} style={{background:'#fff',borderRadius:10,border:'1px solid #eee',marginBottom:14,overflow:'hidden'}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 14px',background:'#f9f9f9',borderBottom:'1px solid #eee'}}>
+                          <div style={{fontWeight:700,fontSize:13}}>{s==='Sin semana' ? 'Sin semana asignada' : 'Semana ' + s}</div>
+                          <div style={{fontWeight:700,fontSize:14,color:'#C00000'}}>{fmtC(totSem)}</div>
+                        </div>
+                        <div style={{overflowX:'auto'}}>
+                          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                            <thead>
+                              <tr>
+                                {['Artículo','Costo ($)','Estatus','Notas'].map(h=>(
+                                  <th key={h} style={{textAlign:'left',padding:'8px 12px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:12}}>{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {items.map((r,i)=>(
+                                <tr key={r.id||i} style={{background:i%2?'#f9f9f9':'#fff'}}>
+                                  <td style={{padding:'8px 12px',fontWeight:600}}>{r.producto}</td>
+                                  <td style={{padding:'8px 12px',fontWeight:700,color:'#C00000'}}>{fmtC(r.impacto)}</td>
+                                  <td style={{padding:'8px 12px'}}>
+                                    <span style={{background:yaCobrado(r)?'#EAF3DE':'#FCEBEB',color:yaCobrado(r)?'#3B6D11':'#A32D2D',padding:'2px 8px',borderRadius:100,fontSize:11,fontWeight:700,whiteSpace:'nowrap'}}>
+                                      {yaCobrado(r)?'✓ COBRADO':'A COBRO'}
+                                    </span>
+                                  </td>
+                                  <td style={{padding:'8px 12px',color:'#888',fontSize:12}}>{r.notas||'—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </>
+              )
+            })()}
           </div>
         )}
 
