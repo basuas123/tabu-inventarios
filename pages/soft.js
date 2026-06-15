@@ -113,22 +113,21 @@ export default function SoftPage() {
           const difUnd  = colDifUnd >= 0  ? (parseFloat(row[colDifUnd])  || 0) : (fisico - exist)
           const difImp  = colDifImp >= 0  ? (parseFloat(row[colDifImp])  || 0) : (difUnd * costo)
 
-          // Ignorar productos con existencia negativa en Soft (error histórico del sistema)
-          // Solo considerar diferencias donde la existencia del sistema es >= 0
-          const existValida = exist >= 0
-          const difReal     = existValida ? difUnd  : 0
-          const impReal     = existValida ? difImp  : 0
+          // Procesar TODOS los productos, incluso con existencia negativa en Soft:
+          // un teórico negativo necesita ajustarse para que la siguiente semana
+          // arranque con la existencia física real.
+          const existValida = true
+          const difReal     = difUnd
+          const impReal     = difImp
 
           productos[desc] = { existencia: exist, fisico, costo, unidad: unid, grupo, difUnd: difReal, difImp: impReal, existValida }
 
-          if (existValida) {
-            if (Math.abs(difReal) > 0.001) {
-              if (impReal < 0) totalFaltante += impReal
-              else if (impReal > 0) totalSobrante += impReal
-            }
-            // Guardar TODOS los productos (con y sin diferencia) para exportar a Soft
-            detalleProductos.push({ desc, difUnd: difReal, difImp: impReal, costo, grupo, fisico, exist })
+          if (Math.abs(difReal) > 0.001) {
+            if (impReal < 0) totalFaltante += impReal
+            else if (impReal > 0) totalSobrante += impReal
           }
+          // Guardar TODOS los productos (con y sin diferencia) para exportar a Soft
+          detalleProductos.push({ desc, difUnd: difReal, difImp: impReal, costo, grupo, fisico, exist })
         }
 
         // Si el archivo ya trae los cálculos de Soft, guardar el análisis directo
@@ -190,7 +189,6 @@ export default function SoftPage() {
 
     // Usar diferencias ya calculadas por Soft Restaurant
     Object.entries(softData).forEach(([nombre, prod]) => {
-      if (!prod.existValida) return  // ignorar existencias negativas en Soft
       const dif = prod.difUnd || 0
       const imp = prod.difImp || 0
       // Incluir todos los productos (con y sin diferencia)
