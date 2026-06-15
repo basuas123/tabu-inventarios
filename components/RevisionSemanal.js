@@ -338,7 +338,7 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
 
   // ── UI ──────────────────────────────────────────────────────────────
   const t = totales()
-  const inp = { width: 78, padding: '4px 6px', border: '1px solid #ddd', borderRadius: 6, fontSize: 11, textAlign: 'center' }
+  const inp = { width: 64, padding: '4px 6px', border: '1px solid #ddd', borderRadius: 6, fontSize: 11, textAlign: 'center' }
   const card = { background: '#fff', borderRadius: 12, border: '1px solid #e5e5e5', padding: 18, marginBottom: 16 }
   const btn = { padding: '8px 14px', borderRadius: 7, border: 'none', background: '#002060', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 }
 
@@ -410,8 +410,9 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
             </div>
           </div>
 
-          <div style={{ ...card, overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <div style={card}>
+            <div style={{ overflowX: 'auto', width: '100%' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 1180 }}>
               <thead>
                 <tr>
                   {['Producto', 'Cobro previo (cant. y $)', 'Inv. sem. anterior', 'Compras', 'Ventas', 'Inv. esta semana', 'Diferencia', 'Merma', 'Dif. neta', 'Costo unit.', 'Impacto $', 'Estado', 'Notas'].map(h => (
@@ -465,6 +466,7 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
                 })}
               </tbody>
             </table>
+            </div>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
               <button style={{ ...btn, background: '#3B6D11' }} onClick={exportar}>📤 Exportar Excel</button>
