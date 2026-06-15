@@ -699,7 +699,7 @@ export default function DireccionPage() {
                     <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
                       <thead>
                         <tr>
-                          {['Producto','Grupo','Diferencia','Impacto ($)','Resultado','Cant. ajustada','Acción'].map(h=>(
+                          {['Producto','Grupo','Sistema (Soft)','Físico','Diferencia','Impacto ($)','Resultado','Cant. ajustada','Acción'].map(h=>(
                             <th key={h} style={{textAlign:'left',padding:'7px 8px',borderBottom:'1px solid #eee',color:'#888',fontWeight:600,fontSize:11}}>{h}</th>
                           ))}
                         </tr>
@@ -709,6 +709,12 @@ export default function DireccionPage() {
                           <tr key={r.nombre} style={{background:i%2?'#f9f9f9':'#fff'}}>
                             <td style={{padding:'6px 8px',fontWeight:500}}>{r.nombre}</td>
                             <td style={{padding:'6px 8px',color:'#888',fontSize:11}}>{r.grupo}</td>
+                            <td style={{padding:'6px 8px',textAlign:'right',fontWeight:600,color:r.sistema<0?'#C00000':'#555'}}>
+                              {parseFloat(r.sistema||0).toFixed(3)}{r.sistema<0?' ⚠':''}
+                            </td>
+                            <td style={{padding:'6px 8px',textAlign:'right',fontWeight:600,color:'#185FA5'}}>
+                              {parseFloat(r.fisico||0).toFixed(3)}
+                            </td>
                             <td style={{padding:'6px 8px',textAlign:'right',color:r.dif<0?'#C00000':'#3B6D11',fontWeight:600}}>
                               {r.dif && r.dif !== 0 ? (r.dif > 0 ? '+' : '') : ''}{parseFloat(r.dif||0).toFixed(3)}
                             </td>
