@@ -90,16 +90,15 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
     try {
       const nomSuc = SUCURSALES.find(s => s.k === sucKey)?.n || sucKey
 
-      // 1. Productos enviados a cobro en semanas anteriores
+      // 1. Productos enviados a cobro EN LA SEMANA INMEDIATA ANTERIOR únicamente
+      const semAnt = parseInt(sem) > 1 ? { s: parseInt(sem) - 1, a: año } : { s: 52, a: año - 1 }
       const rRev = await fetch('/api/revisiones?sucursal=' + encodeURIComponent(nomSuc))
       const jRev = await rRev.json()
-      const previas = (jRev.data || []).filter(r => {
-        if (num(r.año) < año) return true
-        if (num(r.año) > año) return false
-        return num(r.semana) < parseInt(sem)
-      })
+      const previas = (jRev.data || []).filter(r =>
+        num(r.semana) === semAnt.s && num(r.año) === semAnt.a
+      )
       if (previas.length === 0) {
-        setError('No hay productos enviados a cobro en semanas anteriores para esta sucursal.')
+        setError('No hay productos enviados a cobro en la semana ' + semAnt.s + ' para esta sucursal.')
         setLoading(false); return
       }
       const cobroPorProducto = {}
@@ -166,7 +165,7 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
       }
       setFilas(nuevas)
       setOrden(nombres)
-      setMsg(`${nombres.length} productos en vigilancia (enviados a cobro antes de la semana ${sem}).`)
+      setMsg(`${nombres.length} productos en vigilancia (enviados a cobro en la semana ${semAnt.s}).`)
     } catch (err) {
       setError('Error al cargar: ' + err.message)
     }
@@ -365,7 +364,7 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
           <div style={{ fontSize: 12, color: '#888' }}>{año}</div>
         </div>
         <div style={{ fontSize: 11, color: '#999', marginTop: 8 }}>
-          Solo entran productos que se enviaron a cobro en semanas anteriores. Inventario anterior y captura actual se llenan automáticamente del sistema; compras y ventas se cargan de los archivos del Soft.
+          Solo entran productos que se enviaron a cobro la semana inmediata anterior. Inventario anterior y captura actual se llenan automáticamente del sistema; compras y ventas se cargan de los archivos del Soft.
         </div>
       </div>
 
