@@ -350,8 +350,53 @@ export default function DireccionPage() {
             }
           } catch (e2) {}
         }
+        // Recalcular físico y diferencia EN VIVO con la última captura de la sucursal.
+        // El teórico (sistema) se mantiene del Soft; el físico se toma de lo que
+        // el gerente tenga capturado ahora, para que un reconteo actualice la diferencia.
+        if (resultados?.detalle?.length) {
+          try {
+            const año = new Date().getFullYear()
+            const [catRes, invRes] = await Promise.all([
+              fetch('/api/productos?sucursal=' + sucKey).then(r => r.json()),
+              fetch('/api/inventario?sucursal=' + sucKey + '&semana=' + semSel + '&año=' + año).then(r => r.json()),
+            ])
+            const cat = catRes.productos || []
+            const datos = invRes.data?.[0]?.datos || {}
+            // mapa nombre -> id de producto
+            const idPorNombre = {}
+            cat.forEach(p => { idPorNombre[(p.nombre || '').toUpperCase().trim()] = p.id })
+            // ¿hay captura nueva para algún producto del análisis?
+            const hayCaptura = Object.keys(datos).length > 0
+            if (hayCaptura) {
+              let tF = 0, tS = 0
+              resultados = {
+                ...resultados,
+                detalle: resultados.detalle.map(d => {
+                  const id = idPorNombre[(d.nombre || '').toUpperCase().trim()]
+                  const cap = id != null ? datos[id] : undefined
+                  if (cap === undefined || cap === '' || cap === null) return d  // sin reconteo, dejar igual
+                  const fisicoNuevo = parseFloat(cap) || 0
+                  const sistema = parseFloat(d.sistema) || 0
+                  const costo = parseFloat(d.costo) || 0
+                  const dif = fisicoNuevo - sistema
+                  const imp = dif * costo
+                  return {
+                    ...d,
+                    fisico: fisicoNuevo,
+                    dif,
+                    imp,
+                    resultado: Math.abs(imp) < 0.001 ? 'OK' : imp < 0 ? 'FALTANTE' : 'SOBRANTE',
+                  }
+                })
+              }
+              resultados.detalle.forEach(d => { if (d.imp < 0) tF += d.imp; else tS += d.imp })
+              resultados.totalFalt = tF
+              resultados.totalSobr = tS
+              resultados.neto = tF + tS
+            }
+          } catch (e3) {}
+        }
         setAnalisisSuc(resultados)
-        if (conDetalle) setSemanaAnalisis(conDetalle.semana)
       } else {
         setAnalisisSuc(null)
         setSemanaAnalisis(null)
