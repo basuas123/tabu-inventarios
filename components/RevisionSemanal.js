@@ -94,11 +94,20 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
       const semAnt = parseInt(sem) > 1 ? { s: parseInt(sem) - 1, a: año } : { s: 52, a: año - 1 }
       const rRev = await fetch('/api/revisiones?sucursal=' + encodeURIComponent(nomSuc))
       const jRev = await rRev.json()
-      const previas = (jRev.data || []).filter(r =>
-        num(r.semana) === semAnt.s && num(r.año) === semAnt.a
-      )
+      // Estatus que cuentan como "en proceso de revisión/cobro" (no cerrados aún)
+      const ESTATUS_VIGILA = ['PENDIENTE','EN REVISIÓN','REVISADA','CORREGIDO','CONFIRMADO','A COBRO']
+      const previas = (jRev.data || []).filter(r => {
+        const enSemAnt = num(r.semana) === semAnt.s && num(r.año) === semAnt.a
+        // También incluir cualquier producto que siga en estatus de revisión,
+        // aunque su registro no tenga la semana exacta (registros viejos)
+        const sinSemana = (r.semana == null || r.semana === '')
+        const enRevision = ESTATUS_VIGILA.includes(String(r.estatus || '').toUpperCase().trim())
+        // Excluir lo de la semana actual o futura (eso aún no se revisa)
+        const noFuturo = num(r.año) < año || (num(r.año) === año && num(r.semana) < parseInt(sem))
+        return (enSemAnt) || (enRevision && (sinSemana || noFuturo))
+      })
       if (previas.length === 0) {
-        setError('No hay productos enviados a cobro en la semana ' + semAnt.s + ' para esta sucursal.')
+        setError('No hay productos en revisión/cobro pendientes para esta sucursal.')
         setLoading(false); return
       }
       const cobroPorProducto = {}
@@ -165,7 +174,7 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
       }
       setFilas(nuevas)
       setOrden(nombres)
-      setMsg(`${nombres.length} productos en vigilancia (enviados a cobro en la semana ${semAnt.s}).`)
+      setMsg(`${nombres.length} productos en vigilancia (en revisión/cobro de la semana ${semAnt.s} o aún sin cerrar).`)
     } catch (err) {
       setError('Error al cargar: ' + err.message)
     }
@@ -364,7 +373,7 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
           <div style={{ fontSize: 12, color: '#888' }}>{año}</div>
         </div>
         <div style={{ fontSize: 11, color: '#999', marginTop: 8 }}>
-          Solo entran productos que se enviaron a cobro la semana inmediata anterior. Inventario anterior y captura actual se llenan automáticamente del sistema; compras y ventas se cargan de los archivos del Soft.
+          Entran los productos que siguen en revisión o cobro (de la semana anterior o aún sin cerrar). Inventario anterior y captura actual se llenan automáticamente del sistema; compras y ventas se cargan de los archivos del Soft.
         </div>
       </div>
 
