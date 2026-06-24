@@ -337,7 +337,7 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
 
   // ── UI ──────────────────────────────────────────────────────────────
   const t = totales()
-  const inp = { width: 64, padding: '4px 6px', border: '1px solid #ddd', borderRadius: 6, fontSize: 11, textAlign: 'center' }
+  const inp = { width: 52, padding: '3px 4px', border: '1px solid #ddd', borderRadius: 6, fontSize: 11, textAlign: 'center' }
   const card = { background: '#fff', borderRadius: 12, border: '1px solid #e5e5e5', padding: 18, marginBottom: 16 }
   const btn = { padding: '8px 14px', borderRadius: 7, border: 'none', background: '#002060', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 }
 
@@ -357,7 +357,7 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
           <div style={{ fontSize: 12, color: '#888' }}>Semana</div>
           <input
             type="number" min="1" max="53" value={semana}
-            style={{ ...inp, width: 60 }}
+            style={{ ...inp, width: 46 }}
             onChange={e => setSemana(e.target.value)}
             onBlur={() => suc && cargar(suc, semana)}
           />
@@ -410,12 +410,13 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
           </div>
 
           <div style={card}>
-            <div style={{ overflowX: 'auto', width: '100%' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 1180 }}>
+            <div style={{ fontSize: 10.5, color: '#bbb', marginBottom: 4, textAlign: 'right' }}>← desliza para ver todas las columnas →</div>
+            <div style={{ overflowX: 'scroll', width: '100%', paddingBottom: 6 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5, minWidth: 1040 }}>
               <thead>
                 <tr>
                   {['Producto', 'Cobro previo (cant. y $)', 'Inv. sem. anterior', 'Compras', 'Ventas', 'Inv. esta semana', 'Diferencia', 'Merma', 'Dif. neta', 'Costo unit.', 'Impacto $', 'Estado', 'Notas'].map(h => (
-                    <th key={h} style={{ textAlign: 'left', padding: '7px 8px', borderBottom: '1px solid #eee', color: '#888', fontWeight: 600, fontSize: 11, whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} style={{ textAlign: 'left', padding: '6px 5px', borderBottom: '1px solid #eee', color: '#888', fontWeight: 600, fontSize: 10.5, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -439,18 +440,18 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
                         </div>
                         <div style={{ fontSize: 10 }}>{fmt$(f.cobro?.impacto)}</div>
                       </td>
-                      <td style={{ padding: '6px 4px' }}><input data-rev-nav type="number" step="0.001" style={inp} value={f.b} onChange={e => setCampo(nom, 'b', e.target.value)} onKeyDown={navegarEnter} /></td>
-                      <td style={{ padding: '6px 4px' }}><input data-rev-nav type="number" step="0.001" style={inp} value={f.c} onChange={e => setCampo(nom, 'c', e.target.value)} onKeyDown={navegarEnter} /></td>
-                      <td style={{ padding: '6px 4px' }}><input data-rev-nav type="number" step="0.001" style={inp} value={f.d} onChange={e => setCampo(nom, 'd', e.target.value)} onKeyDown={navegarEnter} /></td>
-                      <td style={{ padding: '6px 4px' }}><input data-rev-nav type="number" step="0.001" style={inp} value={f.e} onChange={e => setCampo(nom, 'e', e.target.value)} onKeyDown={navegarEnter} /></td>
+                      <td style={{ padding: '5px 2px' }}><input data-rev-nav type="number" step="0.001" style={inp} value={f.b} onChange={e => setCampo(nom, 'b', e.target.value)} onKeyDown={navegarEnter} /></td>
+                      <td style={{ padding: '5px 2px' }}><input data-rev-nav type="number" step="0.001" style={inp} value={f.c} onChange={e => setCampo(nom, 'c', e.target.value)} onKeyDown={navegarEnter} /></td>
+                      <td style={{ padding: '5px 2px' }}><input data-rev-nav type="number" step="0.001" style={inp} value={f.d} onChange={e => setCampo(nom, 'd', e.target.value)} onKeyDown={navegarEnter} /></td>
+                      <td style={{ padding: '5px 2px' }}><input data-rev-nav type="number" step="0.001" style={inp} value={f.e} onChange={e => setCampo(nom, 'e', e.target.value)} onKeyDown={navegarEnter} /></td>
                       <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600, color: negDif ? '#C00000' : (posDif ? '#3B6D11' : '#555') }}>
                         {dif === null ? '—' : (posDif ? '+' : '') + fmtQ(dif)}
                       </td>
-                      <td style={{ padding: '6px 4px' }}><input data-rev-nav type="number" min="0" step="0.001" style={{ ...inp, width: 60 }} value={f.merma} onChange={e => setCampo(nom, 'merma', e.target.value)} onKeyDown={navegarEnter} /></td>
+                      <td style={{ padding: '5px 2px' }}><input data-rev-nav type="number" min="0" step="0.001" style={{ ...inp, width: 46 }} value={f.merma} onChange={e => setCampo(nom, 'merma', e.target.value)} onKeyDown={navegarEnter} /></td>
                       <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, color: difNeta !== null && esNegativo(difNeta) ? '#C00000' : '#3B6D11' }}>
                         {difNeta === null ? '—' : fmtQ(difNeta)}
                       </td>
-                      <td style={{ padding: '6px 4px' }}><input data-rev-nav type="number" min="0" step="0.01" style={{ ...inp, width: 70 }} value={f.costo} onChange={e => setCampo(nom, 'costo', e.target.value)} onKeyDown={navegarEnter} /></td>
+                      <td style={{ padding: '5px 2px' }}><input data-rev-nav type="number" min="0" step="0.01" style={{ ...inp, width: 56 }} value={f.costo} onChange={e => setCampo(nom, 'costo', e.target.value)} onKeyDown={navegarEnter} /></td>
                       <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, color: impacto !== null && esNegativo(impacto) ? '#C00000' : '#3B6D11' }}>
                         {impacto === null ? '—' : (esNegativo(impacto) ? '-' : '') + fmt$(impacto)}
                       </td>
@@ -458,7 +459,7 @@ export default function RevisionSemanal({ SUCURSALES, semanaInicial }) {
                         <span style={{ background: est.bg, color: est.col, padding: '2px 8px', borderRadius: 100, fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' }}>{est.t}</span>
                       </td>
                       <td style={{ padding: '6px 4px' }}>
-                        <input data-rev-nav type="text" placeholder="ej. 0.256 merma" style={{ ...inp, width: 120, textAlign: 'left' }} value={f.nota} onChange={e => setCampo(nom, 'nota', e.target.value)} onKeyDown={navegarEnter} />
+                        <input data-rev-nav type="text" placeholder="ej. 0.256 merma" style={{ ...inp, width: 96, textAlign: 'left' }} value={f.nota} onChange={e => setCampo(nom, 'nota', e.target.value)} onKeyDown={navegarEnter} />
                       </td>
                     </tr>
                   )
